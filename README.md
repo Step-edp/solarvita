@@ -60,15 +60,17 @@ Para voltar ao ambiente de teste (deploy automatico na branch `teste`):
 .\scripts\publicar-producao.ps1 -VoltarTeste
 ```
 
-### Workflows GitHub Actions (opcional)
+### Workflows GitHub Actions (opcional, recomendado)
 
-Os arquivos em `.github/workflows/` publicam via GitHub Actions. Se o push dos workflows falhar por falta de permissao `workflow`, autorize uma vez em:
+Templates em `deploy/workflows/`. Para ativar deploy via Actions:
 
-https://github.com/settings/applications
-
-Depois faca push da branch `teste` normalmente.
+1. Autorize escopo **workflow** no GitHub: https://github.com/settings/applications
+2. Execute: `.\scripts\instalar-workflows.ps1`
+3. Commit e push da pasta `.github/workflows/`
 
 - **Deploy Teste** — automatico a cada push em `teste`
 - **Deploy Producao** — manual em Actions, digitando `DEPLOY` para confirmar
+
+Enquanto os workflows nao estiverem no GitHub, use o script `publicar-producao.ps1` para producao.
 
 

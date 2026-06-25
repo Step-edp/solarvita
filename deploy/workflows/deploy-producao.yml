@@ -1,0 +1,57 @@
+name: Deploy Producao
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacao:
+        description: 'Digite DEPLOY para publicar produção'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-producao
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: inputs.confirmacao == 'DEPLOY'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout branch producao
+        uses: actions/checkout@v4
+        with:
+          ref: producao
+
+      - name: Preparar artefato
+        run: |
+          mkdir -p _site
+          shopt -s extglob
+          for f in *.html *.css *.js; do
+            [ -e "$f" ] && cp "$f" _site/
+          done
+          cp .nojekyll _site/ 2>/dev/null || true
+
+      - name: Upload artefato
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  cancelado:
+    if: inputs.confirmacao != 'DEPLOY'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy cancelado
+        run: |
+          echo "Deploy cancelado. Digite exatamente DEPLOY no campo de confirmação."
