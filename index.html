@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SolarVita — Energia Solar para sua Casa</title>
+  <meta name="description" content="Calcule quanto você pode economizar com energia solar. Simulação gratuita e instantânea.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <nav class="nav container">
+      <a href="index.html" class="logo">
+        <span class="logo-icon">☀</span>
+        SolarVita
+      </a>
+      <ul class="nav-links">
+        <li><a href="#calculadora">Calculadora</a></li>
+        <li><a href="#beneficios">Benefícios</a></li>
+        <li><a href="#como-funciona">Como funciona</a></li>
+        <li class="nav-actions">
+          <a href="login.html?tipo=parceiro" class="btn btn-sm btn-partner">Seja Parceiro</a>
+          <a href="login.html?tipo=cliente" class="btn btn-sm btn-outline">Área do cliente</a>
+          <a href="login.html?tipo=admin" class="btn btn-sm btn-ghost">Administrador</a>
+        </li>
+      </ul>
+      <button class="menu-toggle" aria-label="Abrir menu">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero + Calculadora -->
+    <section class="hero" id="calculadora">
+      <div class="hero-bg"></div>
+      <div class="container hero-grid">
+        <div class="hero-text">
+          <span class="badge">✦ Economize até 95% na conta de luz</span>
+          <h1>Descubra o potencial solar da <em>sua casa</em></h1>
+          <p class="hero-subtitle">
+            Use a calculadora abaixo e veja em segundos quanto você pode economizar,
+            quantos painéis precisa e em quanto tempo o investimento se paga.
+          </p>
+          <ul class="hero-stats">
+            <li>
+              <strong>+12.000</strong>
+              <span>Instalações</span>
+            </li>
+            <li>
+              <strong>25 anos</strong>
+              <span>Garantia</span>
+            </li>
+            <li>
+              <strong>4.9★</strong>
+              <span>Avaliação</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="calculator-card">
+          <div class="calculator-header">
+            <h2>Calculadora Solar</h2>
+            <p>Preencha os dados da sua conta de luz</p>
+          </div>
+
+          <form id="solar-form" class="calculator-form">
+            <div class="form-group">
+              <label for="consumo">Consumo mensal (kWh)</label>
+              <div class="input-wrapper">
+                <input type="number" id="consumo" name="consumo" min="50" max="5000" placeholder="Ex: 350" required>
+                <span class="input-suffix">kWh</span>
+              </div>
+              <small>Ou informe o valor da conta abaixo</small>
+            </div>
+
+            <div class="form-divider"><span>ou</span></div>
+
+            <div class="form-group">
+              <label for="conta">Valor da conta mensal (R$)</label>
+              <div class="input-wrapper">
+                <span class="input-prefix">R$</span>
+                <input type="number" id="conta" name="conta" min="50" max="10000" step="0.01" placeholder="Ex: 280,00">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="estado">Estado</label>
+                <select id="estado" name="estado" required>
+                  <option value="SP">São Paulo</option>
+                  <option value="RJ">Rio de Janeiro</option>
+                  <option value="MG">Minas Gerais</option>
+                  <option value="PR">Paraná</option>
+                  <option value="RS">Rio Grande do Sul</option>
+                  <option value="SC">Santa Catarina</option>
+                  <option value="BA">Bahia</option>
+                  <option value="GO">Goiás</option>
+                  <option value="PE">Pernambuco</option>
+                  <option value="CE">Ceará</option>
+                  <option value="OUTRO">Outro</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="telhado">Tipo de telhado</label>
+                <select id="telhado" name="telhado">
+                  <option value="ceramico">Cerâmico</option>
+                  <option value="metalico">Metálico</option>
+                  <option value="laje">Laje plana</option>
+                  <option value="fibrocimento">Fibrocimento</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">
+              <span>Calcular economia</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </form>
+
+          <div id="resultado" class="resultado hidden">
+            <div class="resultado-header">
+              <span class="resultado-icon">☀</span>
+              <h3>Seu sistema ideal</h3>
+            </div>
+            <div class="resultado-grid">
+              <div class="result-item highlight">
+                <span class="result-label">Economia mensal</span>
+                <span class="result-value" id="res-economia">—</span>
+              </div>
+              <div class="result-item">
+                <span class="result-label">Potência do sistema</span>
+                <span class="result-value" id="res-potencia">—</span>
+              </div>
+              <div class="result-item">
+                <span class="result-label">Painéis necessários</span>
+                <span class="result-value" id="res-paineis">—</span>
+              </div>
+              <div class="result-item">
+                <span class="result-label">Investimento estimado</span>
+                <span class="result-value" id="res-investimento">—</span>
+              </div>
+              <div class="result-item">
+                <span class="result-label">Payback estimado</span>
+                <span class="result-value" id="res-payback">—</span>
+              </div>
+              <div class="result-item">
+                <span class="result-label">Economia em 25 anos</span>
+                <span class="result-value" id="res-total">—</span>
+              </div>
+            </div>
+            <a href="#contato" class="btn btn-primary btn-full">Solicitar orçamento personalizado</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Benefícios -->
+    <section class="beneficios" id="beneficios">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">Por que solar?</span>
+          <h2>Energia limpa que <em>transforma</em> sua vida</h2>
+        </div>
+        <div class="beneficios-grid">
+          <article class="beneficio-card">
+            <div class="beneficio-icon">💰</div>
+            <h3>Reduza até 95% da conta</h3>
+            <p>Geração própria de energia com retorno financeiro comprovado em poucos anos.</p>
+          </article>
+          <article class="beneficio-card">
+            <div class="beneficio-icon">🌱</div>
+            <h3>Zero poluição</h3>
+            <p>Cada kWh solar evita emissões de CO₂ e contribui para um planeta mais saudável.</p>
+          </article>
+          <article class="beneficio-card">
+            <div class="beneficio-icon">🏠</div>
+            <h3>Valoriza seu imóvel</h3>
+            <p>Imóveis com energia solar têm maior valor de mercado e atratividade.</p>
+          </article>
+          <article class="beneficio-card">
+            <div class="beneficio-icon">⚡</div>
+            <h3>Independência energética</h3>
+            <p>Proteja-se contra reajustes tarifários e instabilidades na rede elétrica.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Como funciona -->
+    <section class="como-funciona" id="como-funciona">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">Processo simples</span>
+          <h2>Do orçamento à instalação em <em>4 passos</em></h2>
+        </div>
+        <div class="passos">
+          <div class="passo">
+            <span class="passo-num">01</span>
+            <h3>Simulação gratuita</h3>
+            <p>Use a calculadora ou fale com nossos especialistas para um estudo personalizado.</p>
+          </div>
+          <div class="passo">
+            <span class="passo-num">02</span>
+            <h3>Projeto técnico</h3>
+            <p>Dimensionamos o sistema ideal para seu consumo, telhado e localização.</p>
+          </div>
+          <div class="passo">
+            <span class="passo-num">03</span>
+            <h3>Instalação certificada</h3>
+            <p>Equipe própria instala em 1 a 3 dias com equipamentos de alta eficiência.</p>
+          </div>
+          <div class="passo">
+            <span class="passo-num">04</span>
+            <h3>Ligação e economia</h3>
+            <p>Cuidamos da homologação na concessionária. Você começa a economizar.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta" id="contato">
+      <div class="container cta-inner">
+        <div class="cta-text">
+          <h2>Pronto para começar a economizar?</h2>
+          <p>Receba um orçamento gratuito e sem compromisso em até 24 horas.</p>
+        </div>
+        <form class="cta-form" id="contato-form">
+          <input type="text" name="nome" placeholder="Seu nome" required>
+          <input type="email" name="email" placeholder="Seu e-mail" required>
+          <input type="tel" name="telefone" placeholder="WhatsApp" required>
+          <button type="submit" class="btn btn-primary">Quero meu orçamento</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <a href="#" class="logo">
+        <span class="logo-icon">☀</span>
+        SolarVita
+      </a>
+      <p>© 2026 SolarVita Energia Solar. Todos os direitos reservados.</p>
+      <p class="footer-note">* Valores estimados. Consulte condições reais com nossa equipe.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

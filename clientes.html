@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Base de Clientes — SolarVita</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body class="panel-page">
+  <header class="panel-header">
+    <div class="container">
+      <a href="index.html" class="auth-logo">
+        <span>☀</span> SolarVita
+      </a>
+      <div class="panel-user">
+        Olá, <strong id="user-name">—</strong>
+      </div>
+      <button id="btn-logout" class="btn btn-outline-light">Sair</button>
+    </div>
+  </header>
+
+  <main class="panel-content">
+    <div id="panel-clientes" class="panel-vendedor"></div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="data/demo-data.js"></script>
+  <script src="auth.js"></script>
+  <script src="vendedor.js"></script>
+  <script>initClientesPage();</script>
+</body>
+</html>

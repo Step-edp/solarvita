@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — SolarVita</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body class="auth-page">
+  <div class="auth-bg"></div>
+
+  <header class="auth-header">
+    <div class="container">
+      <a href="index.html" class="auth-logo">
+        <span>☀</span> SolarVita
+      </a>
+    </div>
+  </header>
+
+  <main class="auth-main">
+    <div class="auth-card">
+      <span class="auth-badge" id="auth-badge">🏠 Cliente</span>
+      <h1 id="auth-title">Entrar</h1>
+      <p class="auth-subtitle" id="auth-subtitle">Acesse com seu CPF e senha</p>
+
+      <div id="auth-alert" class="auth-alert"></div>
+
+      <form id="login-form" class="auth-form">
+        <div class="form-group" id="perfil-group" hidden>
+          <label for="perfil">Perfil de acesso</label>
+          <select id="perfil" name="perfil">
+            <option value="">Selecione seu perfil</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="cpf">CPF</label>
+          <input type="text" id="cpf" name="cpf" placeholder="000.000.000-00" maxlength="14" inputmode="numeric" autocomplete="username" required>
+          <span class="field-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label for="senha">Senha</label>
+          <div class="password-toggle">
+            <input type="password" id="senha" name="senha" placeholder="Sua senha" autocomplete="current-password" required>
+            <button type="button" aria-label="Mostrar senha">👁</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full">Entrar</button>
+      </form>
+
+      <div class="auth-footer">
+        Não tem cadastro? <a id="link-cadastro" href="cadastro.html?tipo=cliente">Cadastre-se</a>
+      </div>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="data/demo-data.js"></script>
+  <script src="auth.js"></script>
+  <script>initLoginPage();</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel — SolarVita</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="auth.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+</head>
+<body class="panel-page">
+  <header class="panel-header">
+    <div class="container">
+      <a href="index.html" class="auth-logo">
+        <span>☀</span> SolarVita
+      </a>
+      <div class="panel-user">
+        Olá, <strong id="user-name">—</strong>
+      </div>
+      <button id="btn-logout" class="btn btn-outline-light">Sair</button>
+    </div>
+  </header>
+
+  <main class="panel-content">
+    <div id="panel-default">
+      <div class="panel-card">
+        <h1 id="panel-title">Painel</h1>
+        <p id="panel-desc">—</p>
+        <p><strong>CPF:</strong> <span id="user-cpf">—</span></p>
+        <p><strong>Perfil:</strong> <span id="user-role">—</span></p>
+        <p id="user-whatsapp-row" hidden><strong>WhatsApp:</strong> <span id="user-whatsapp">—</span></p>
+        <p id="user-nascimento-row" hidden><strong>Data de nascimento:</strong> <span id="user-nascimento">—</span></p>
+        <br>
+        <a href="index.html" class="btn btn-primary">Voltar ao site</a>
+      </div>
+
+      <div id="panel-modules" class="panel-modules" hidden></div>
+    </div>
+
+    <div id="panel-vendedor" class="panel-vendedor" hidden></div>
+    <div id="panel-admin" class="panel-admin" hidden></div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="config.js"></script>
+  <script src="data/demo-data.js"></script>
+  <script src="auth.js"></script>
+  <script src="vendedor.js"></script>
+  <script src="admin.js"></script>
+  <script>initPainelPage();</script>
+</body>
+</html>
