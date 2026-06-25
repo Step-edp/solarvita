@@ -64,13 +64,20 @@ Para voltar ao ambiente de teste (deploy automatico na branch `teste`):
 
 Templates em `deploy/workflows/`. Para ativar deploy via Actions:
 
-1. Autorize escopo **workflow** no GitHub: https://github.com/settings/applications
-2. Execute: `.\scripts\instalar-workflows.ps1`
-3. Commit e push da pasta `.github/workflows/`
+**Opcao A — Token (mais simples)**
+
+1. Gere um token em: https://github.com/settings/tokens/new?scopes=repo,workflow&description=SolarVita-Actions
+2. Execute: `.\scripts\configurar-github-actions-com-token.ps1`
+3. Cole o token quando pedido
+
+**Opcao B — GitHub CLI**
+
+1. Execute: `.\scripts\configurar-github-actions.ps1`
+2. Autorize no navegador quando aparecer o codigo
 
 - **Deploy Teste** — automatico a cada push em `teste`
 - **Deploy Producao** — manual em Actions, digitando `DEPLOY` para confirmar
 
-Enquanto os workflows nao estiverem no GitHub, use o script `publicar-producao.ps1` para producao.
+Enquanto os workflows nao estiverem ativos, use `publicar-producao.ps1` para producao.
 
 
