@@ -36,3 +36,41 @@ git checkout producao   # ambiente de produção
 ```
 
 A diferença entre os ambientes está em `config.js` e na presença de `data/demo-data.js`.
+
+## Deploy (GitHub Pages)
+
+Site: **https://step-edp.github.io/solarvita/**
+
+| Ambiente | Branch | Como publicar |
+|----------|--------|---------------|
+| **Teste** | `teste` | **Automatico** — a cada `git push` na branch `teste` |
+| **Producao** | `producao` | **Manual** — somente quando voce pedir (veja abaixo) |
+
+### Publicar producao (manual)
+
+No PowerShell, na pasta do projeto:
+
+```powershell
+.\scripts\publicar-producao.ps1
+```
+
+Para voltar ao ambiente de teste (deploy automatico na branch `teste`):
+
+```powershell
+.\scripts\publicar-producao.ps1 -VoltarTeste
+```
+
+### Workflows GitHub Actions (opcional, recomendado)
+
+Templates em `deploy/workflows/`. Para ativar deploy via Actions:
+
+1. Autorize escopo **workflow** no GitHub: https://github.com/settings/applications
+2. Execute: `.\scripts\instalar-workflows.ps1`
+3. Commit e push da pasta `.github/workflows/`
+
+- **Deploy Teste** — automatico a cada push em `teste`
+- **Deploy Producao** — manual em Actions, digitando `DEPLOY` para confirmar
+
+Enquanto os workflows nao estiverem no GitHub, use o script `publicar-producao.ps1` para producao.
+
+

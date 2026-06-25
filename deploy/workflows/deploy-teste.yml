@@ -1,0 +1,44 @@
+name: Deploy Teste
+
+on:
+  push:
+    branches:
+      - teste
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-teste
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preparar artefato
+        run: |
+          mkdir -p _site
+          shopt -s extglob
+          for f in *.html *.css *.js; do
+            [ -e "$f" ] && cp "$f" _site/
+          done
+          cp -r data _site/ 2>/dev/null || true
+          cp .nojekyll _site/ 2>/dev/null || true
+
+      - name: Upload artefato
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
