@@ -4,6 +4,6 @@
  * producao → branch producao (apenas login admin seed)
  */
 const SOLARVITA_CONFIG = {
-  ambiente: 'teste',
-  useDemoData: true
+  ambiente: 'producao',
+  useDemoData: false
 };
