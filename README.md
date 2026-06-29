@@ -80,4 +80,23 @@ Templates em `deploy/workflows/`. Para ativar deploy via Actions:
 
 Enquanto os workflows nao estiverem ativos, use `publicar-producao.ps1` para producao.
 
+## Deploy (Railway)
+
+Repositorio: **https://github.com/Step-edp/solarvita**
+
+| Ambiente | Branch | Deploy |
+|----------|--------|--------|
+| **Teste** | `teste` | Automatico a cada push |
+| **Producao** | `producao` | Manual (somente quando voce solicitar) |
+
+### Configurar no Railway (uma vez)
+
+1. Acesse https://railway.com/new
+2. **Deploy from GitHub repo** → `Step-edp/solarvita`
+3. Ambiente **teste**: branch `teste`, **Auto Deploy** ligado
+4. Crie ambiente **producao**: branch `producao`, **Auto Deploy** desligado
+5. Deploy de producao: botao **Deploy** no painel Railway
+
+O site sobe com `npm start` (servidor estatico na porta `PORT`).
+
 
