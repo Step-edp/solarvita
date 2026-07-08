@@ -293,19 +293,7 @@ function validateWhatsApp(phone) {
 function validateBirthDate(dateStr) {
   if (!dateStr) return false;
   const date = new Date(dateStr + 'T00:00:00');
-  if (Number.isNaN(date.getTime())) return false;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (date >= today) return false;
-
-  const minAge = new Date();
-  minAge.setFullYear(minAge.getFullYear() - 18);
-  if (date > minAge) return false;
-
-  const minDate = new Date();
-  minDate.setFullYear(minDate.getFullYear() - 100);
-  return date >= minDate;
+  return !Number.isNaN(date.getTime());
 }
 
 function formatBirthDate(dateStr) {
@@ -342,11 +330,8 @@ function setupAdminExtraFields(tipo) {
     whatsappInput.required = true;
     nascimentoInput.required = true;
     setupWhatsAppInput(whatsappInput);
-
-    const maxDate = new Date();
-    maxDate.setFullYear(maxDate.getFullYear() - 18);
-    nascimentoInput.max = maxDate.toISOString().split('T')[0];
-    nascimentoInput.min = '1920-01-01';
+    nascimentoInput.removeAttribute('min');
+    nascimentoInput.removeAttribute('max');
     return { emailInput, whatsappInput, nascimentoInput };
   }
 
