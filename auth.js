@@ -28,7 +28,7 @@ const ROLES = {
     label: 'Área Administrativa',
     icon: '⚙️',
     loginTitle: 'Área Administrativa',
-    loginSubtitle: 'Selecione seu perfil e acesse com CPF e senha',
+    loginSubtitle: 'Acesse com CPF e senha — seu perfil é identificado automaticamente',
     cadastroTitle: 'Cadastro Administrativo',
     cadastroSubtitle: 'Escolha seu perfil e crie sua conta de acesso',
     panelTitle: 'Painel Administrativo',
@@ -125,10 +125,31 @@ function getUsersRaw() {
 
 initAuthData();
 
+function pageUrl(page, tipo, extraParams = {}) {
+  const params = new URLSearchParams();
+  if (tipo) params.set('tipo', tipo);
+  Object.entries(extraParams).forEach(([key, value]) => {
+    if (value != null && value !== '') params.set(key, value);
+  });
+  const query = params.toString();
+  return query ? `/${page}?${query}` : `/${page}`;
+}
+
 function getTipo() {
   const params = new URLSearchParams(window.location.search);
-  const tipo = params.get('tipo');
-  return ROLES[tipo] ? tipo : 'cliente';
+  const fromQuery = params.get('tipo');
+  if (ROLES[fromQuery]) return fromQuery;
+
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const pageIdx = segments.findIndex((segment) =>
+    ['login', 'cadastro', 'painel', 'clientes', 'cadastro-pendente'].includes(segment.replace('.html', ''))
+  );
+  if (pageIdx >= 0) {
+    const fromPath = segments[pageIdx + 1];
+    if (fromPath && ROLES[fromPath]) return fromPath;
+  }
+
+  return 'cliente';
 }
 
 function getUsers() {
@@ -268,7 +289,7 @@ function validateEmail(email) {
 }
 
 function showPendingApproval(tipo) {
-  window.location.href = `cadastro-pendente.html?tipo=${tipo}`;
+  window.location.href = pageUrl('cadastro-pendente', tipo);
 }
 
 function setupAdminExtraFields(tipo) {
@@ -330,6 +351,18 @@ function getPerfilFromForm(perfilSelect) {
   return perfilSelect ? perfilSelect.value : null;
 }
 
+function findUserForLogin(cpf, senha, tipo) {
+  const candidates = getUsers().filter(u => u.cpf === cpf && u.tipo === tipo);
+  if (!candidates.length) return { error: 'not_found' };
+
+  const matches = candidates.filter(u => u.senha === senha);
+  if (!matches.length) return { error: 'wrong_password' };
+  if (matches.length === 1) return { user: matches[0] };
+
+  const approved = matches.find(u => isAdminApproved(u));
+  return { user: approved || matches[0] };
+}
+
 function initLoginPage() {
   const tipo = getTipo();
   const role = ROLES[tipo];
@@ -338,7 +371,7 @@ function initLoginPage() {
   document.getElementById('auth-badge').textContent = `${role.icon} ${role.label}`;
   document.getElementById('auth-title').textContent = role.loginTitle;
   document.getElementById('auth-subtitle').textContent = role.loginSubtitle;
-  document.getElementById('link-cadastro').href = `cadastro.html?tipo=${tipo}`;
+  document.getElementById('link-cadastro').href = pageUrl('cadastro', tipo);
 
   const form = document.getElementById('login-form');
   const alert = document.getElementById('auth-alert');
@@ -346,7 +379,6 @@ function initLoginPage() {
 
   setupCPFInput(cpfInput);
   setupPasswordToggle(document.querySelector('.password-toggle'));
-  const perfilSelect = setupAdminPerfilField(tipo);
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -354,16 +386,10 @@ function initLoginPage() {
 
     const cpf = onlyDigits(cpfInput.value);
     const senha = document.getElementById('senha').value;
-    const perfil = getPerfilFromForm(perfilSelect);
 
     if (!validateCPF(cpf)) {
       cpfInput.classList.add('error');
       showAlert(alert, 'CPF inválido. Verifique os números digitados.');
-      return;
-    }
-
-    if (tipo === 'admin' && !perfil) {
-      showAlert(alert, 'Selecione seu perfil de acesso.');
       return;
     }
 
@@ -372,29 +398,27 @@ function initLoginPage() {
       return;
     }
 
-    const user = getUsers().find(u =>
-      u.cpf === cpf &&
-      u.tipo === tipo &&
-      (tipo !== 'admin' || u.perfil === perfil)
-    );
+    const result = findUserForLogin(cpf, senha, tipo);
 
-    if (!user) {
+    if (result.error === 'not_found') {
       showAlert(alert, 'CPF não cadastrado nesta área. Clique em "Cadastre-se" para criar sua conta.');
       return;
     }
 
-    if (user.senha !== senha) {
+    if (result.error === 'wrong_password') {
       showAlert(alert, 'Senha incorreta. Tente novamente.');
       return;
     }
 
+    const user = result.user;
+
     if (tipo === 'admin' && !isAdminApproved(user)) {
-      window.location.href = 'cadastro-pendente.html?tipo=admin';
+      window.location.href = pageUrl('cadastro-pendente', 'admin');
       return;
     }
 
     setSession(user);
-    window.location.href = `painel.html?tipo=${tipo}`;
+    window.location.href = pageUrl('painel', tipo);
   });
 }
 
@@ -406,7 +430,7 @@ function initCadastroPage() {
   document.getElementById('auth-badge').textContent = `${role.icon} ${role.label}`;
   document.getElementById('auth-title').textContent = role.cadastroTitle;
   document.getElementById('auth-subtitle').textContent = role.cadastroSubtitle;
-  document.getElementById('link-login').href = `login.html?tipo=${tipo}`;
+  document.getElementById('link-login').href = pageUrl('login', tipo);
 
   const form = document.getElementById('cadastro-form');
   const alert = document.getElementById('auth-alert');
@@ -510,7 +534,7 @@ function initCadastroPage() {
 
     showAlert(alert, 'Cadastro realizado com sucesso! Redirecionando...', 'success');
     setTimeout(() => {
-      window.location.href = `painel.html?tipo=${tipo}`;
+      window.location.href = pageUrl('painel', tipo);
     }, 1200);
   });
 }
@@ -535,12 +559,12 @@ function initPainelPage() {
   const session = getSession();
 
   if (!session || session.tipo !== tipo) {
-    window.location.href = `login.html?tipo=${tipo}`;
+    window.location.href = pageUrl('login', tipo);
     return;
   }
 
   if (tipo === 'admin' && !session.perfil) {
-    window.location.href = 'login.html?tipo=admin';
+    window.location.href = pageUrl('login', 'admin');
     return;
   }
 
@@ -559,7 +583,7 @@ function initPainelPage() {
       document.getElementById('user-name').textContent = session.nome;
       document.getElementById('btn-logout').addEventListener('click', () => {
         clearSession();
-        window.location.href = `login.html?tipo=${tipo}`;
+        window.location.href = pageUrl('login', tipo);
       });
       return;
     }
@@ -569,7 +593,7 @@ function initPainelPage() {
       document.getElementById('user-name').textContent = session.nome;
       document.getElementById('btn-logout').addEventListener('click', () => {
         clearSession();
-        window.location.href = `login.html?tipo=${tipo}`;
+        window.location.href = pageUrl('login', tipo);
       });
       return;
     }
@@ -596,7 +620,7 @@ function initPainelPage() {
 
   document.getElementById('btn-logout').addEventListener('click', () => {
     clearSession();
-    window.location.href = `login.html?tipo=${tipo}`;
+    window.location.href = pageUrl('login', tipo);
   });
 }
 
@@ -605,17 +629,17 @@ function initClientesPage() {
   let tipo = getTipo();
 
   if (!session) {
-    window.location.href = `login.html?tipo=admin`;
+    window.location.href = pageUrl('login', 'admin');
     return;
   }
 
   if (session.tipo === 'admin' && tipo !== 'admin') {
-    window.location.replace('clientes.html?tipo=admin');
+    window.location.replace(pageUrl('clientes', 'admin'));
     return;
   }
 
   if (session.tipo !== 'admin' || session.perfil !== 'vendedor') {
-    window.location.href = `painel.html?tipo=${session.tipo || tipo}`;
+    window.location.href = pageUrl('painel', session.tipo || tipo);
     return;
   }
 
@@ -626,6 +650,6 @@ function initClientesPage() {
 
   document.getElementById('btn-logout').addEventListener('click', () => {
     clearSession();
-    window.location.href = `login.html?tipo=${tipo}`;
+    window.location.href = pageUrl('login', tipo);
   });
 }

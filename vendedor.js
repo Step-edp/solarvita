@@ -2558,7 +2558,7 @@ function renderVendedorDashboard(session) {
       <button type="button" id="btn-registrar-cliente" class="btn btn-primary btn-registrar">
         <span>+</span> Registrar cliente
       </button>
-      <a href="clientes.html?tipo=admin" class="btn btn-outline-light btn-base-clientes">
+      <a href="/clientes?tipo=admin" class="btn btn-outline-light btn-base-clientes">
         Minha base de clientes
       </a>
     </div>
@@ -2788,7 +2788,7 @@ function renderVendedorDashboard(session) {
           <h2>Mapa de visitas</h2>
           <p class="section-desc">Endereços que você já visitou na região</p>
         </div>
-        <a href="clientes.html?tipo=admin" class="btn btn-outline-light btn-sm">Ver base de clientes</a>
+        <a href="/clientes?tipo=admin" class="btn btn-outline-light btn-sm">Ver base de clientes</a>
       </div>
       <div id="vendedor-map" class="vendedor-map"></div>
       <ul class="visitas-list" id="visitas-list">
@@ -2841,11 +2841,11 @@ function renderVendedorClientesPage(session) {
   panel.innerHTML = `
     <div class="vendedor-header">
       <div>
-        <a href="painel.html?tipo=admin" class="clientes-back-link">← Voltar ao painel</a>
+        <a href="/painel?tipo=admin" class="clientes-back-link">← Voltar ao painel</a>
         <h1>Minha base de clientes</h1>
         <p>Olá, <strong>${session.nome}</strong> — consulte e filtre todos os seus clientes cadastrados</p>
       </div>
-      <a href="painel.html?tipo=admin" class="btn btn-primary">+ Registrar cliente</a>
+      <a href="/painel?tipo=admin" class="btn btn-primary">+ Registrar cliente</a>
     </div>
 
     <div id="clientes-resumo-stats" class="clientes-resumo-grid"></div>
