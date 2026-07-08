@@ -21,6 +21,18 @@ router.get('/cadastros/pendentes', async (req, res, next) => {
   }
 });
 
+router.get('/usuarios', async (req, res, next) => {
+  try {
+    const result = await query(
+      `SELECT * FROM users
+       ORDER BY criado_em DESC`
+    );
+    res.json({ usuarios: result.rows.map(mapUserRow) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.patch('/cadastros/:cpf/:perfil', async (req, res, next) => {
   try {
     const cpf = String(req.params.cpf).replace(/\D/g, '');

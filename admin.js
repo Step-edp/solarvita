@@ -9,6 +9,7 @@ const ADMIN_EQUIPE_ATIVIDADES = (typeof SOLARVITA_DEMO !== 'undefined' && SOLARV
 let adminSessionRef = null;
 let adminActiveTab = 'cadastros';
 let adminInitialTabSet = false;
+let adminUsuariosFilter = { search: '', tipo: '', status: '' };
 
 function getAtividadesAdiadasAtivas(colaborador) {
   return colaborador.atividades.filter((a) => !a.concluida && a.diasAdiada > 0);
@@ -50,6 +51,94 @@ function formatDataCadastro(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function getTipoLabel(tipo) {
+  return ROLES[tipo]?.label || tipo || '—';
+}
+
+function getStatusLabel(status) {
+  if (status === 'pendente') return 'Pendente';
+  if (status === 'rejeitado') return 'Rejeitado';
+  return 'Aprovado';
+}
+
+function getStatusClass(status) {
+  if (status === 'pendente') return 'admin-user-status-pendente';
+  if (status === 'rejeitado') return 'admin-user-status-rejeitado';
+  return 'admin-user-status-aprovado';
+}
+
+function getUsuariosResumo(usuarios) {
+  const resumo = {
+    total: usuarios.length,
+    admin: 0,
+    cliente: 0,
+    parceiro: 0,
+    pendentes: 0
+  };
+
+  usuarios.forEach((user) => {
+    if (user.tipo === 'admin') resumo.admin += 1;
+    if (user.tipo === 'cliente') resumo.cliente += 1;
+    if (user.tipo === 'parceiro') resumo.parceiro += 1;
+    if (user.status === 'pendente') resumo.pendentes += 1;
+  });
+
+  return resumo;
+}
+
+function filterUsuarios(usuarios) {
+  const term = adminUsuariosFilter.search.trim().toLowerCase();
+  const digits = term.replace(/\D/g, '');
+
+  return usuarios.filter((user) => {
+    if (adminUsuariosFilter.tipo && user.tipo !== adminUsuariosFilter.tipo) return false;
+    if (adminUsuariosFilter.status && (user.status || 'aprovado') !== adminUsuariosFilter.status) return false;
+
+    if (!term) return true;
+
+    const haystack = [
+      user.nome,
+      user.cpf,
+      user.email,
+      user.whatsapp,
+      getTipoLabel(user.tipo),
+      getPerfilLabel(user.perfil),
+      getStatusLabel(user.status)
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    if (haystack.includes(term)) return true;
+    if (digits && user.cpf.includes(digits)) return true;
+    return false;
+  });
+}
+
+function renderUsuariosRows(usuarios) {
+  if (!usuarios.length) {
+    return '<tr><td colspan="8" class="admin-table-empty">Nenhum usuário encontrado com os filtros atuais.</td></tr>';
+  }
+
+  return usuarios
+    .map((user) => {
+      const status = user.status || 'aprovado';
+      const perfilCell = user.tipo === 'admin'
+        ? `<span class="admin-perfil-badge">${getPerfilLabel(user.perfil)}</span>`
+        : '—';
+
+      return `
+        <tr>
+          <td><strong>${user.nome}</strong></td>
+          <td>${formatCPF(user.cpf)}</td>
+          <td>${getTipoLabel(user.tipo)}</td>
+          <td>${perfilCell}</td>
+          <td>${user.email || '—'}</td>
+          <td>${user.whatsapp ? formatWhatsApp(user.whatsapp) : '—'}</td>
+          <td><span class="admin-user-status ${getStatusClass(status)}">${getStatusLabel(status)}</span></td>
+          <td>${formatDataCadastro(user.criadoEm)}</td>
+        </tr>
+      `;
+    }).join('');
 }
 
 function getPerfilLabel(perfil) {
@@ -147,6 +236,45 @@ function switchAdminTab(tabId) {
   });
 }
 
+function handleAdminPanelInput(event) {
+  const searchInput = event.target.closest('[data-usuarios-search]');
+  if (searchInput) {
+    adminUsuariosFilter.search = searchInput.value;
+    refreshUsuariosTable();
+    return;
+  }
+
+  const tipoSelect = event.target.closest('[data-usuarios-tipo]');
+  if (tipoSelect) {
+    adminUsuariosFilter.tipo = tipoSelect.value;
+    refreshUsuariosTable();
+    return;
+  }
+
+  const statusSelect = event.target.closest('[data-usuarios-status]');
+  if (statusSelect) {
+    adminUsuariosFilter.status = statusSelect.value;
+    refreshUsuariosTable();
+  }
+}
+
+function refreshUsuariosTable() {
+  const adminPanel = document.getElementById('panel-admin');
+  if (!adminPanel || !adminPanel.dataset.usuariosJson) return;
+
+  const usuarios = JSON.parse(adminPanel.dataset.usuariosJson);
+  const filtrados = filterUsuarios(usuarios);
+  const tbody = adminPanel.querySelector('[data-usuarios-tbody]');
+  const countEl = adminPanel.querySelector('[data-usuarios-count]');
+
+  if (tbody) tbody.innerHTML = renderUsuariosRows(filtrados);
+  if (countEl) {
+    countEl.textContent = filtrados.length === usuarios.length
+      ? `${usuarios.length} usuário${usuarios.length === 1 ? '' : 's'}`
+      : `${filtrados.length} de ${usuarios.length} usuários`;
+  }
+}
+
 function handleAdminPanelClick(event) {
   const tabBtn = event.target.closest('[data-admin-tab]');
   if (tabBtn) {
@@ -185,6 +313,8 @@ async function renderAdministradorDashboard(session) {
   if (!adminPanel.dataset.eventsBound) {
     adminPanel.dataset.eventsBound = '1';
     adminPanel.addEventListener('click', handleAdminPanelClick);
+    adminPanel.addEventListener('input', handleAdminPanelInput);
+    adminPanel.addEventListener('change', handleAdminPanelInput);
   }
 
   adminSessionRef = session;
@@ -199,22 +329,32 @@ async function renderAdministradorDashboard(session) {
   });
   const pendentesList = Array.isArray(pendentes) ? pendentes : [];
   const pendentesError = Array.isArray(pendentes) ? null : pendentes.error;
+
+  const usuariosResult = await getAllUsuarios().catch((error) => {
+    console.error(error);
+    return { error: error.message || 'Não foi possível carregar os usuários.' };
+  });
+  const usuariosList = Array.isArray(usuariosResult) ? usuariosResult : [];
+  const usuariosError = Array.isArray(usuariosResult) ? null : usuariosResult.error;
+  const usuariosFiltrados = filterUsuarios(usuariosList);
+  const usuariosResumo = getUsuariosResumo(usuariosList);
+
   const { colaboradores, totalAdiadas, totalDias, totalVezes } = getResumoEquipe();
   const colaboradoresComAdiadas = colaboradores.filter((c) => c.metricas.qtdAdiadas > 0).length;
 
   if (!adminInitialTabSet) {
-    adminActiveTab = pendentesList.length ? 'cadastros' : 'atividades';
+    adminActiveTab = pendentesList.length ? 'cadastros' : 'usuarios';
     adminInitialTabSet = true;
   }
   if (adminActiveTab === 'cadastros' && !pendentesList.length) {
-    adminActiveTab = 'atividades';
+    adminActiveTab = 'usuarios';
   }
 
   adminPanel.innerHTML = `
     <div class="admin-header">
       <div>
         <h1>Painel do Administrador</h1>
-        <p>Olá, <strong>${session.nome}</strong> — gerencie cadastros e acompanhe a equipe</p>
+        <p>Olá, <strong>${session.nome}</strong> — gerencie cadastros, usuários e acompanhe a equipe</p>
       </div>
       <a href="/" class="btn btn-outline-light">Voltar ao site</a>
     </div>
@@ -223,6 +363,10 @@ async function renderAdministradorDashboard(session) {
       <button type="button" class="admin-tab ${adminActiveTab === 'cadastros' ? 'active' : ''}" data-admin-tab="cadastros">
         Cadastros pendentes
         ${pendentesList.length ? `<span class="admin-tab-badge">${pendentesList.length}</span>` : ''}
+      </button>
+      <button type="button" class="admin-tab ${adminActiveTab === 'usuarios' ? 'active' : ''}" data-admin-tab="usuarios">
+        Usuários
+        <span class="admin-tab-badge admin-tab-badge-muted">${usuariosResumo.total}</span>
       </button>
       <button type="button" class="admin-tab ${adminActiveTab === 'atividades' ? 'active' : ''}" data-admin-tab="atividades">
         Atividades adiadas
@@ -257,6 +401,89 @@ async function renderAdministradorDashboard(session) {
             </thead>
             <tbody>
               ${renderCadastrosPendentesRows(pendentesList)}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="admin-tab-panel" data-admin-panel="usuarios" ${adminActiveTab !== 'usuarios' ? 'hidden' : ''}>
+      <div class="admin-stats-grid">
+        <div class="admin-stat-card">
+          <span class="admin-stat-label">Total de usuários</span>
+          <span class="admin-stat-value">${usuariosResumo.total}</span>
+          <span class="admin-stat-extra">Cadastrados no sistema</span>
+        </div>
+        <div class="admin-stat-card">
+          <span class="admin-stat-label">Administrativos</span>
+          <span class="admin-stat-value">${usuariosResumo.admin}</span>
+          <span class="admin-stat-extra">Perfis internos</span>
+        </div>
+        <div class="admin-stat-card">
+          <span class="admin-stat-label">Clientes</span>
+          <span class="admin-stat-value">${usuariosResumo.cliente}</span>
+          <span class="admin-stat-extra">Área do cliente</span>
+        </div>
+        <div class="admin-stat-card">
+          <span class="admin-stat-label">Parceiros</span>
+          <span class="admin-stat-value">${usuariosResumo.parceiro}</span>
+          <span class="admin-stat-extra">Rede de parceiros</span>
+        </div>
+      </div>
+
+      <section class="vendedor-section admin-section">
+        <h2>Usuários cadastrados</h2>
+        <p class="section-desc">Visualize todos os usuários do sistema, com tipo, perfil e status de acesso.</p>
+        ${usuariosError ? `<div class="auth-alert show error">${usuariosError}</div>` : ''}
+
+        <div class="clientes-toolbar admin-usuarios-toolbar">
+          <div class="clientes-toolbar-search">
+            <label for="admin-usuarios-search" class="visually-hidden">Buscar usuários</label>
+            <input
+              type="search"
+              id="admin-usuarios-search"
+              data-usuarios-search
+              placeholder="Buscar por nome, CPF, e-mail ou perfil..."
+              value="${adminUsuariosFilter.search.replace(/"/g, '&quot;')}"
+            >
+          </div>
+          <div class="clientes-toolbar-filters">
+            <select data-usuarios-tipo aria-label="Filtrar por tipo">
+              <option value="" ${adminUsuariosFilter.tipo === '' ? 'selected' : ''}>Todos os tipos</option>
+              <option value="admin" ${adminUsuariosFilter.tipo === 'admin' ? 'selected' : ''}>Administrativo</option>
+              <option value="cliente" ${adminUsuariosFilter.tipo === 'cliente' ? 'selected' : ''}>Cliente</option>
+              <option value="parceiro" ${adminUsuariosFilter.tipo === 'parceiro' ? 'selected' : ''}>Parceiro</option>
+            </select>
+            <select data-usuarios-status aria-label="Filtrar por status">
+              <option value="" ${adminUsuariosFilter.status === '' ? 'selected' : ''}>Todos os status</option>
+              <option value="aprovado" ${adminUsuariosFilter.status === 'aprovado' ? 'selected' : ''}>Aprovado</option>
+              <option value="pendente" ${adminUsuariosFilter.status === 'pendente' ? 'selected' : ''}>Pendente</option>
+              <option value="rejeitado" ${adminUsuariosFilter.status === 'rejeitado' ? 'selected' : ''}>Rejeitado</option>
+            </select>
+            <span class="clientes-count" data-usuarios-count>
+              ${usuariosFiltrados.length === usuariosList.length
+                ? `${usuariosList.length} usuário${usuariosList.length === 1 ? '' : 's'}`
+                : `${usuariosFiltrados.length} de ${usuariosList.length} usuários`}
+            </span>
+          </div>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table admin-table-usuarios">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>CPF</th>
+                <th>Tipo</th>
+                <th>Perfil</th>
+                <th>E-mail</th>
+                <th>WhatsApp</th>
+                <th>Status</th>
+                <th>Cadastrado em</th>
+              </tr>
+            </thead>
+            <tbody data-usuarios-tbody>
+              ${renderUsuariosRows(usuariosFiltrados)}
             </tbody>
           </table>
         </div>
@@ -310,4 +537,6 @@ async function renderAdministradorDashboard(session) {
       </section>
     </div>
   `;
+
+  adminPanel.dataset.usuariosJson = JSON.stringify(usuariosList);
 }

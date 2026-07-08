@@ -56,6 +56,10 @@ const SolarVitaAPI = {
     return this.request('/admin/cadastros/pendentes');
   },
 
+  getUsuarios() {
+    return this.request('/admin/usuarios');
+  },
+
   setCadastroStatus(cpf, perfil, status) {
     return this.request(`/admin/cadastros/${cpf}/${perfil}`, {
       method: 'PATCH',

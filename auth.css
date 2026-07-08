@@ -750,6 +750,48 @@ body.auth-page {
   vertical-align: middle;
 }
 
+.admin-tab-badge-muted {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.admin-tab.active .admin-tab-badge-muted {
+  background: rgba(0, 27, 77, 0.12);
+  color: var(--color-navy);
+}
+
+.admin-usuarios-toolbar {
+  margin-bottom: 1rem;
+}
+
+.admin-table-usuarios td,
+.admin-table-usuarios th {
+  vertical-align: middle;
+}
+
+.admin-user-status {
+  display: inline-block;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-user-status-aprovado {
+  background: rgba(0, 151, 57, 0.12);
+  color: var(--color-green-dark);
+}
+
+.admin-user-status-pendente {
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+}
+
+.admin-user-status-rejeitado {
+  background: rgba(220, 38, 38, 0.1);
+  color: #991b1b;
+}
+
 @media (max-width: 768px) {
   .admin-stats-grid {
     grid-template-columns: repeat(2, 1fr);

@@ -221,6 +221,30 @@ async function getPendingCadastros() {
   return getPendingCadastrosLocal();
 }
 
+function mapLocalUserRow(user) {
+  return {
+    nome: user.nome,
+    cpf: user.cpf,
+    email: user.email || null,
+    tipo: user.tipo,
+    perfil: user.perfil || null,
+    whatsapp: user.whatsapp || null,
+    nascimento: user.nascimento || null,
+    status: user.status || 'aprovado',
+    criadoEm: user.criadoEm || null,
+    aprovadoEm: user.aprovadoEm || null,
+    rejeitadoEm: user.rejeitadoEm || null
+  };
+}
+
+async function getAllUsuarios() {
+  if (usesDatabase()) {
+    const data = await SolarVitaAPI.getUsuarios();
+    return data.usuarios || [];
+  }
+  return getUsersRaw().map(mapLocalUserRow);
+}
+
 function setCadastroStatusLocal(cpf, perfil, status) {
   const users = getUsersRaw();
   const idx = users.findIndex(u =>
