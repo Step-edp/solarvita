@@ -3,6 +3,8 @@
  * Armazena usuários em localStorage (demo sem backend)
  */
 
+const CADASTRO_CLIENTE_PERFIS = ['vendedor', 'backoffice', 'marketing', 'financeiro', 'projetista'];
+
 const ROLES = {
   parceiro: {
     label: 'Parceiro',
@@ -878,6 +880,16 @@ function initPainelPage() {
         return;
       }
 
+      if (['backoffice', 'marketing', 'financeiro', 'projetista'].includes(session.perfil)) {
+        await renderPainelOperacional(session);
+        document.getElementById('user-name').textContent = getPrimeiroNome(session.nome);
+        document.getElementById('btn-logout').addEventListener('click', async () => {
+          await clearSessionAsync();
+          window.location.href = pageUrl('login', tipo);
+        });
+        return;
+      }
+
       if (session.perfil === 'administrador') {
         await renderAdministradorDashboard(session);
         document.getElementById('user-name').textContent = getPrimeiroNome(session.nome);
@@ -937,7 +949,7 @@ function initClientesPage() {
       return;
     }
 
-    if (session.tipo !== 'admin' || session.perfil !== 'vendedor') {
+    if (session.tipo !== 'admin' || !CADASTRO_CLIENTE_PERFIS.includes(session.perfil)) {
       window.location.href = pageUrl('painel', session.tipo || tipo);
       return;
     }

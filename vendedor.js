@@ -2549,53 +2549,8 @@ const STATUS_LABELS = {
   prospectado: { label: 'Prospectado', class: 'status-prospectado' }
 };
 
-async function renderVendedorDashboard(session) {
-  await syncVendedorClientesFromApi();
-
-  const defaultPanel = document.getElementById('panel-default');
-  const vendedorPanel = document.getElementById('panel-vendedor');
-
-  if (defaultPanel) defaultPanel.hidden = true;
-  if (!vendedorPanel) return;
-
-  vendedorPanel.hidden = false;
-  document.title = 'Painel do Vendedor — SolarVita';
-
-  const taxaConversao = VENDEDOR_STATS.apresentadas
-    ? Math.round((VENDEDOR_STATS.convertidas / VENDEDOR_STATS.apresentadas) * 100)
-    : 0;
-
-  vendedorPanel.innerHTML = `
-    <div class="comissao-banner">
-      <div class="comissao-banner-inner">
-        <div class="comissao-texto">
-          <span class="comissao-label">Comissão a receber este mês</span>
-          <span class="comissao-mes">${getMesAtualLabel()}</span>
-        </div>
-        <div class="comissao-valor-wrap">
-          <span class="comissao-valor" id="comissao-valor">${formatCurrency(VENDEDOR_COMISSAO_MES)}</span>
-          <span class="comissao-detalhe">${VENDEDOR_STATS.convertidas} vendas convertidas</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="vendedor-top-bar">
-      <button type="button" id="btn-registrar-cliente" class="btn btn-primary btn-registrar">
-        <span>+</span> Registrar cliente
-      </button>
-      <a href="/clientes/admin" class="btn btn-outline-light btn-base-clientes">
-        Minha base de clientes
-      </a>
-    </div>
-
-    <div class="vendedor-header">
-      <div>
-        <h1>Painel do Vendedor</h1>
-        <p>Olá, <strong>${getPrimeiroNome(session.nome)}</strong> — acompanhe suas propostas e visitas</p>
-      </div>
-      <a href="index.html" class="btn btn-outline-light">Voltar ao site</a>
-    </div>
-
+function buildRegistrarClienteModalHtml() {
+  return `
     <div id="modal-registrar-cliente" class="modal-registrar" hidden>
       <div class="modal-overlay"></div>
       <div class="modal-box modal-box-lg">
@@ -2762,6 +2717,91 @@ async function renderVendedorDashboard(session) {
         </form>
       </div>
     </div>
+  `;
+}
+
+async function renderPainelOperacional(session) {
+  await syncVendedorClientesFromApi();
+
+  const defaultPanel = document.getElementById('panel-default');
+  const vendedorPanel = document.getElementById('panel-vendedor');
+  const adminPanel = document.getElementById('panel-admin');
+  const profile = ADMIN_PROFILES[session.perfil];
+
+  if (defaultPanel) defaultPanel.hidden = true;
+  if (adminPanel) adminPanel.hidden = true;
+  if (!vendedorPanel || !profile) return;
+
+  vendedorPanel.hidden = false;
+  document.title = `${profile.panelTitle} — SolarVita`;
+
+  vendedorPanel.innerHTML = `
+    <div class="panel-operacional-wrap">
+      <div class="panel-card panel-card-action">
+        <h1>${profile.panelTitle}</h1>
+        <p>${profile.panelDesc}</p>
+        <div class="panel-operacional-actions">
+          <button type="button" id="btn-registrar-cliente" class="btn btn-primary btn-registrar">
+            <span>+</span> Cadastrar
+          </button>
+          <a href="/clientes/admin" class="btn btn-outline-light">Minha base de clientes</a>
+        </div>
+      </div>
+    </div>
+    ${buildRegistrarClienteModalHtml()}
+  `;
+
+  initRegistrarCliente();
+}
+
+async function renderVendedorDashboard(session) {
+  await syncVendedorClientesFromApi();
+
+  const defaultPanel = document.getElementById('panel-default');
+  const vendedorPanel = document.getElementById('panel-vendedor');
+
+  if (defaultPanel) defaultPanel.hidden = true;
+  if (!vendedorPanel) return;
+
+  vendedorPanel.hidden = false;
+  document.title = 'Painel do Vendedor — SolarVita';
+
+  const taxaConversao = VENDEDOR_STATS.apresentadas
+    ? Math.round((VENDEDOR_STATS.convertidas / VENDEDOR_STATS.apresentadas) * 100)
+    : 0;
+
+  vendedorPanel.innerHTML = `
+    <div class="comissao-banner">
+      <div class="comissao-banner-inner">
+        <div class="comissao-texto">
+          <span class="comissao-label">Comissão a receber este mês</span>
+          <span class="comissao-mes">${getMesAtualLabel()}</span>
+        </div>
+        <div class="comissao-valor-wrap">
+          <span class="comissao-valor" id="comissao-valor">${formatCurrency(VENDEDOR_COMISSAO_MES)}</span>
+          <span class="comissao-detalhe">${VENDEDOR_STATS.convertidas} vendas convertidas</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="vendedor-top-bar">
+      <button type="button" id="btn-registrar-cliente" class="btn btn-primary btn-registrar">
+        <span>+</span> Registrar cliente
+      </button>
+      <a href="/clientes/admin" class="btn btn-outline-light btn-base-clientes">
+        Minha base de clientes
+      </a>
+    </div>
+
+    <div class="vendedor-header">
+      <div>
+        <h1>Painel do Vendedor</h1>
+        <p>Olá, <strong>${getPrimeiroNome(session.nome)}</strong> — acompanhe suas propostas e visitas</p>
+      </div>
+      <a href="index.html" class="btn btn-outline-light">Voltar ao site</a>
+    </div>
+
+    ${buildRegistrarClienteModalHtml()}
 
     <div id="modal-agenda-acao" class="modal-registrar" hidden>
       <div class="modal-overlay"></div>

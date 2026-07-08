@@ -72,8 +72,10 @@ function requireAdminMaster(req, res, next) {
   next();
 }
 
+const CADASTRO_CLIENTE_PERFIS = ['vendedor', 'backoffice', 'marketing', 'financeiro', 'projetista'];
+
 function requireVendedor(req, res, next) {
-  if (!req.user || req.user.tipo !== 'admin' || req.user.perfil !== 'vendedor') {
+  if (!req.user || req.user.tipo !== 'admin' || !CADASTRO_CLIENTE_PERFIS.includes(req.user.perfil)) {
     return res.status(403).json({ error: 'Acesso negado.' });
   }
   next();
