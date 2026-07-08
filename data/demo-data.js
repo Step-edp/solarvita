@@ -14,6 +14,33 @@ const SOLARVITA_DEMO = {
     status: 'aprovado'
   },
 
+  pendingCadastros: [
+    {
+      nome: 'Mariana Costa',
+      cpf: '52998224725',
+      email: 'mariana.costa@solarvita.com.br',
+      senha: 'Teste@123',
+      tipo: 'admin',
+      perfil: 'financeiro',
+      whatsapp: '11999887766',
+      nascimento: '1988-03-22',
+      status: 'pendente',
+      criadoEm: '2026-07-05T14:30:00.000Z'
+    },
+    {
+      nome: 'Lucas Ferreira',
+      cpf: '39053344705',
+      email: 'lucas.ferreira@solarvita.com.br',
+      senha: 'Teste@123',
+      tipo: 'admin',
+      perfil: 'projetista',
+      whatsapp: '12988776655',
+      nascimento: '1995-11-10',
+      status: 'pendente',
+      criadoEm: '2026-07-07T09:15:00.000Z'
+    }
+  ],
+
   vendedorStats: {
     apresentadas: 47,
     convertidas: 18,

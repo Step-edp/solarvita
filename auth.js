@@ -108,10 +108,44 @@ function upsertAdminUser(userData) {
   saveUsers(users);
 }
 
+function seedPendingAdminUser(userData) {
+  const users = getUsersRaw();
+  const exists = users.some(u =>
+    u.cpf === userData.cpf && u.tipo === 'admin' && u.perfil === userData.perfil
+  );
+
+  if (!exists) {
+    users.push({ ...userData, criadoEm: userData.criadoEm || new Date().toISOString() });
+    saveUsers(users);
+  }
+}
+
+function getPendingCadastros() {
+  return getUsersRaw().filter(u => u.tipo === 'admin' && u.status === 'pendente');
+}
+
+function setCadastroStatus(cpf, perfil, status) {
+  const users = getUsersRaw();
+  const idx = users.findIndex(u =>
+    u.cpf === cpf && u.tipo === 'admin' && u.perfil === perfil
+  );
+
+  if (idx < 0) return false;
+
+  users[idx].status = status;
+  if (status === 'aprovado') users[idx].aprovadoEm = new Date().toISOString();
+  if (status === 'rejeitado') users[idx].rejeitadoEm = new Date().toISOString();
+  saveUsers(users);
+  return true;
+}
+
 function initAuthData() {
   upsertAdminUser(SEED_ADMIN);
   if (SOLARVITA_CONFIG.useDemoData && typeof SOLARVITA_DEMO !== 'undefined' && SOLARVITA_DEMO.seedVendedor) {
     upsertAdminUser(SOLARVITA_DEMO.seedVendedor);
+  }
+  if (SOLARVITA_CONFIG.useDemoData && typeof SOLARVITA_DEMO !== 'undefined' && SOLARVITA_DEMO.pendingCadastros) {
+    SOLARVITA_DEMO.pendingCadastros.forEach(seedPendingAdminUser);
   }
 }
 

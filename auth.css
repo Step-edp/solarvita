@@ -671,6 +671,85 @@ body.auth-page {
   color: rgba(0, 27, 77, 0.45);
 }
 
+.admin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.admin-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.admin-tab:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.admin-tab.active {
+  background: #fff;
+  color: var(--color-navy);
+  border-color: #fff;
+}
+
+.admin-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--color-green);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.admin-tab.active .admin-tab-badge {
+  background: var(--color-navy);
+  color: #fff;
+}
+
+.admin-stats-grid-compact {
+  grid-template-columns: minmax(180px, 280px);
+  margin-bottom: 0.5rem;
+}
+
+.admin-cadastro-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  white-space: nowrap;
+}
+
+.admin-btn-reject {
+  border-color: rgba(220, 53, 69, 0.45);
+  color: #ffb4bc;
+}
+
+.admin-btn-reject:hover {
+  background: rgba(220, 53, 69, 0.15);
+  border-color: rgba(220, 53, 69, 0.65);
+  color: #fff;
+}
+
+.admin-table-cadastros td,
+.admin-table-cadastros th {
+  vertical-align: middle;
+}
+
 @media (max-width: 768px) {
   .admin-stats-grid {
     grid-template-columns: repeat(2, 1fr);
