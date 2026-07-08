@@ -2765,7 +2765,7 @@ async function renderPainelOperacional(session) {
           <button type="button" id="btn-registrar-cliente" class="btn btn-primary btn-registrar">
             <span>+</span> Cadastrar cliente
           </button>
-          <button type="button" id="btn-registrar-pap" class="btn btn-outline-light btn-registrar-pap">
+          <button type="button" id="btn-registrar-pap" class="btn btn-primary btn-registrar">
             <span>+</span> Registrar PAP
           </button>
           <a href="/clientes/admin" class="btn btn-outline-light">Minha base de clientes</a>
@@ -2812,7 +2812,7 @@ async function renderVendedorDashboard(session) {
       <button type="button" id="btn-registrar-cliente" class="btn btn-primary btn-registrar">
         <span>+</span> Registrar cliente
       </button>
-      <button type="button" id="btn-registrar-pap" class="btn btn-outline-light btn-registrar-pap">
+      <button type="button" id="btn-registrar-pap" class="btn btn-primary btn-registrar">
         <span>+</span> Registrar PAP
       </button>
       <a href="/clientes/admin" class="btn btn-outline-light btn-base-clientes">
