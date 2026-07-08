@@ -1909,7 +1909,7 @@ function initPapDeleteHandlers(root = document) {
 }
 
 function renderClientesTableRows() {
-  return renderClientesBaseTableRows(VENDEDOR_CLIENTES);
+  return renderClientesBaseTableRows(getClientesCadastrados());
 }
 
 function formatDataRetorno(iso) {
@@ -1929,6 +1929,10 @@ function formatWhatsAppCliente(value) {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
   }
   return value;
+}
+
+function getClientesCadastrados() {
+  return VENDEDOR_CLIENTES.filter((cliente) => !isPapCliente(cliente));
 }
 
 function filterClientesBase(list, { busca = '', status = '' } = {}) {
@@ -1964,7 +1968,7 @@ function getClientesBaseResumo(list) {
 
 function renderClientesBaseTableRows(clientes, { extended = false } = {}) {
   if (!clientes.length) {
-    const cols = extended ? 9 : 6;
+    const cols = extended ? 8 : 5;
     return `<tr><td colspan="${cols}" class="clientes-empty">Nenhum cliente encontrado.</td></tr>`;
   }
 
@@ -1981,14 +1985,11 @@ function renderClientesBaseTableRows(clientes, { extended = false } = {}) {
     const arqBadge = arqCount
       ? `<span class="arq-badge" title="${arqCount} arquivo(s) anexado(s)">📎 ${arqCount}</span>`
       : '';
-    const papBadge = isPapCliente(c)
-      ? '<span class="pap-badge">PAP</span> '
-      : '';
 
     if (extended) {
       return `
         <tr>
-          <td>${papBadge}<strong>${c.nome}</strong>${arqBadge}</td>
+          <td><strong>${c.nome}</strong>${arqBadge}</td>
           <td>${formatWhatsAppCliente(c.whatsapp)}</td>
           <td>${c.endereco}</td>
           <td><span class="status-badge ${st.class}">${st.label}</span></td>
@@ -1996,19 +1997,17 @@ function renderClientesBaseTableRows(clientes, { extended = false } = {}) {
           <td>${c.tipoRetornoLabel || '—'}</td>
           <td class="col-registro">${registro}${loc ? `<br>${loc}` : ''}</td>
           <td>${obs}</td>
-          <td class="col-acoes">${renderPapDeleteButton(c)}</td>
         </tr>
       `;
     }
 
     return `
       <tr>
-        <td>${papBadge}<strong>${c.nome}</strong>${arqBadge}</td>
+        <td><strong>${c.nome}</strong>${arqBadge}</td>
         <td>${c.endereco}</td>
         <td><span class="status-badge ${st.class}">${st.label}</span></td>
         <td class="col-registro">${registro}${loc !== '—' ? `<br>${loc}` : ''}</td>
         <td>${obs}</td>
-        <td class="col-acoes">${renderPapDeleteButton(c)}</td>
       </tr>
     `;
   }).join('');
@@ -2017,19 +2016,20 @@ function renderClientesBaseTableRows(clientes, { extended = false } = {}) {
 function refreshClientesBaseUI() {
   const busca = document.getElementById('clientes-busca')?.value || '';
   const status = document.getElementById('clientes-filtro-status')?.value || '';
-  const filtrados = filterClientesBase(VENDEDOR_CLIENTES, { busca, status });
+  const clientesBase = getClientesCadastrados();
+  const filtrados = filterClientesBase(clientesBase, { busca, status });
   const tbody = document.getElementById('clientes-base-tbody');
   const countEl = document.getElementById('clientes-count');
   const resumoEl = document.getElementById('clientes-resumo-stats');
 
   if (tbody) tbody.innerHTML = renderClientesBaseTableRows(filtrados, { extended: true });
   if (countEl) {
-    countEl.textContent = filtrados.length === VENDEDOR_CLIENTES.length
-      ? `${VENDEDOR_CLIENTES.length} clientes`
-      : `${filtrados.length} de ${VENDEDOR_CLIENTES.length} clientes`;
+    countEl.textContent = filtrados.length === clientesBase.length
+      ? `${clientesBase.length} clientes`
+      : `${filtrados.length} de ${clientesBase.length} clientes`;
   }
   if (resumoEl) {
-    const resumo = getClientesBaseResumo(VENDEDOR_CLIENTES);
+    const resumo = getClientesBaseResumo(clientesBase);
     resumoEl.innerHTML = `
       <div class="clientes-resumo-item"><span class="clientes-resumo-num">${resumo.total}</span><span>Total</span></div>
       <div class="clientes-resumo-item clientes-resumo-convertido"><span class="clientes-resumo-num">${resumo.convertido}</span><span>Convertidos</span></div>
@@ -3427,7 +3427,6 @@ async function renderVendedorClientesPage(session) {
               <th>Tipo de retorno</th>
               <th>Registro / Local</th>
               <th>Observação</th>
-              <th>Ações</th>
             </tr>
           </thead>
           <tbody id="clientes-base-tbody"></tbody>
@@ -3437,7 +3436,6 @@ async function renderVendedorClientesPage(session) {
   `;
 
   refreshClientesBaseUI();
-  initPapDeleteHandlers(panel);
 
   document.getElementById('clientes-busca')?.addEventListener('input', refreshClientesBaseUI);
   document.getElementById('clientes-filtro-status')?.addEventListener('change', refreshClientesBaseUI);
