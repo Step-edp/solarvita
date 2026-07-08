@@ -12,13 +12,14 @@ function toIsoDate(value) {
 }
 
 function toIsoDateTime(value) {
-  if (!value) return null;
+  if (value == null || value === '') return null;
   if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string') {
+  if (typeof value === 'string' || typeof value === 'number') {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toISOString();
+    return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
   }
-  return null;
+  if (typeof value.toISOString === 'function') return value.toISOString();
+  return String(value);
 }
 
 function mapUserRow(row) {
