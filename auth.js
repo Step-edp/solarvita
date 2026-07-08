@@ -97,6 +97,28 @@ const SEED_ADMIN = {
   status: 'aprovado'
 };
 
+let cachedSession;
+
+function usesDatabase() {
+  return Boolean(SOLARVITA_CONFIG.useDatabase);
+}
+
+async function refreshSession() {
+  if (!usesDatabase()) return getLocalSession();
+  const data = await SolarVitaAPI.me();
+  cachedSession = data.user || null;
+  return cachedSession;
+}
+
+async function clearSessionAsync() {
+  if (usesDatabase()) {
+    await SolarVitaAPI.logout();
+    cachedSession = null;
+    return;
+  }
+  clearLocalSession();
+}
+
 function isAdminApproved(user) {
   return user.tipo !== 'admin' || !user.status || user.status === 'aprovado';
 }
@@ -146,11 +168,19 @@ function cleanupLegacyDemoData() {
   localStorage.setItem(DATA_VERSION_KEY, String(DATA_VERSION));
 }
 
-function getPendingCadastros() {
+function getPendingCadastrosLocal() {
   return getUsersRaw().filter(u => u.tipo === 'admin' && u.status === 'pendente');
 }
 
-function setCadastroStatus(cpf, perfil, status) {
+async function getPendingCadastros() {
+  if (usesDatabase()) {
+    const data = await SolarVitaAPI.getPendingCadastros();
+    return data.cadastros;
+  }
+  return getPendingCadastrosLocal();
+}
+
+function setCadastroStatusLocal(cpf, perfil, status) {
   const users = getUsersRaw();
   const idx = users.findIndex(u =>
     u.cpf === cpf && u.tipo === 'admin' && u.perfil === perfil
@@ -163,6 +193,14 @@ function setCadastroStatus(cpf, perfil, status) {
   if (status === 'rejeitado') users[idx].rejeitadoEm = new Date().toISOString();
   saveUsers(users);
   return true;
+}
+
+async function setCadastroStatus(cpf, perfil, status) {
+  if (usesDatabase()) {
+    await SolarVitaAPI.setCadastroStatus(cpf, perfil, status);
+    return true;
+  }
+  return setCadastroStatusLocal(cpf, perfil, status);
 }
 
 function initAuthData() {
@@ -185,7 +223,33 @@ function getUsersRaw() {
   }
 }
 
-initAuthData();
+if (!usesDatabase()) {
+  initAuthData();
+}
+
+function getLocalSession() {
+  try {
+    return JSON.parse(localStorage.getItem(SESSION_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function setLocalSession(user) {
+  const session = {
+    cpf: user.cpf,
+    tipo: user.tipo,
+    nome: user.nome,
+    perfil: user.perfil || null
+  };
+  if (user.whatsapp) session.whatsapp = user.whatsapp;
+  if (user.nascimento) session.nascimento = user.nascimento;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+function clearLocalSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
 
 function pageUrl(page, tipo, extraParams = {}) {
   const extras = Object.entries(extraParams).filter(([, value]) => value != null && value !== '');
@@ -226,27 +290,27 @@ function saveUsers(users) {
 }
 
 function getSession() {
-  try {
-    return JSON.parse(localStorage.getItem(SESSION_KEY));
-  } catch {
-    return null;
-  }
+  if (usesDatabase()) return cachedSession ?? null;
+  return getLocalSession();
 }
 
 function setSession(user) {
-  const session = {
-    cpf: user.cpf,
-    tipo: user.tipo,
-    nome: user.nome,
-    perfil: user.perfil || null
-  };
-  if (user.whatsapp) session.whatsapp = user.whatsapp;
-  if (user.nascimento) session.nascimento = user.nascimento;
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  if (usesDatabase()) {
+    cachedSession = {
+      cpf: user.cpf,
+      tipo: user.tipo,
+      nome: user.nome,
+      perfil: user.perfil || null,
+      whatsapp: user.whatsapp || null,
+      nascimento: user.nascimento || null
+    };
+    return;
+  }
+  setLocalSession(user);
 }
 
 function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
+  clearLocalSession();
 }
 
 function onlyDigits(str) {
@@ -448,7 +512,7 @@ function initLoginPage() {
   setupCPFInput(cpfInput);
   setupPasswordToggle(document.querySelector('.password-toggle'));
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideAlert(alert);
 
@@ -463,6 +527,29 @@ function initLoginPage() {
 
     if (!senha) {
       showAlert(alert, 'Informe sua senha.');
+      return;
+    }
+
+    if (usesDatabase()) {
+      try {
+        const data = await SolarVitaAPI.login(cpf, senha, tipo);
+        setSession(data.user);
+        window.location.href = pageUrl('painel', data.user.tipo);
+      } catch (error) {
+        if (error.code === 'not_found') {
+          showAlert(alert, 'CPF não cadastrado nesta área. Clique em "Cadastre-se" para criar sua conta.');
+          return;
+        }
+        if (error.code === 'wrong_password') {
+          showAlert(alert, 'Senha incorreta. Tente novamente.');
+          return;
+        }
+        if (error.code === 'pending') {
+          window.location.href = pageUrl('cadastro-pendente', 'admin');
+          return;
+        }
+        showAlert(alert, error.message || 'Não foi possível entrar. Tente novamente.');
+      }
       return;
     }
 
@@ -510,7 +597,7 @@ function initCadastroPage() {
   const perfilSelect = setupAdminPerfilField(tipo);
   const adminFields = setupAdminExtraFields(tipo);
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideAlert(alert);
 
@@ -570,6 +657,34 @@ function initCadastroPage() {
       return;
     }
 
+    if (usesDatabase()) {
+      try {
+        const payload = { nome, cpf, senha, tipo };
+        if (tipo === 'admin' && adminFields) {
+          payload.perfil = perfil;
+          payload.email = adminFields.emailInput.value.trim();
+          payload.whatsapp = onlyDigits(adminFields.whatsappInput.value);
+          payload.nascimento = adminFields.nascimentoInput.value;
+        }
+
+        const data = await SolarVitaAPI.register(payload);
+
+        if (data.pending) {
+          showPendingApproval(tipo);
+          return;
+        }
+
+        setSession(data.user);
+        showAlert(alert, 'Cadastro realizado com sucesso! Redirecionando...', 'success');
+        setTimeout(() => {
+          window.location.href = pageUrl('painel', tipo);
+        }, 1200);
+      } catch (error) {
+        showAlert(alert, error.message || 'Não foi possível concluir o cadastro.');
+      }
+      return;
+    }
+
     const users = getUsers();
     const exists = users.some(u =>
       u.cpf === cpf &&
@@ -623,102 +738,121 @@ function renderAdminModules(perfil) {
 }
 
 function initPainelPage() {
-  const tipo = getTipo();
-  const role = ROLES[tipo];
-  const session = getSession();
+  (async () => {
+    const tipo = getTipo();
+    const role = ROLES[tipo];
 
-  if (!session || session.tipo !== tipo) {
-    window.location.href = pageUrl('login', tipo);
-    return;
-  }
+    if (usesDatabase()) {
+      await refreshSession();
+    }
 
-  if (tipo === 'admin' && !session.perfil) {
-    window.location.href = pageUrl('login', 'admin');
-    return;
-  }
+    const session = getSession();
 
-  let panelTitle = role.panelTitle;
-  let panelDesc = role.panelDesc;
-  let roleLabel = role.label;
-
-  if (tipo === 'admin' && session.perfil && ADMIN_PROFILES[session.perfil]) {
-    const profile = ADMIN_PROFILES[session.perfil];
-    panelTitle = profile.panelTitle;
-    panelDesc = profile.panelDesc;
-    roleLabel = profile.label;
-
-    if (session.perfil === 'vendedor') {
-      renderVendedorDashboard(session);
-      document.getElementById('user-name').textContent = session.nome;
-      document.getElementById('btn-logout').addEventListener('click', () => {
-        clearSession();
-        window.location.href = pageUrl('login', tipo);
-      });
+    if (!session || session.tipo !== tipo) {
+      window.location.href = pageUrl('login', tipo);
       return;
     }
 
-    if (session.perfil === 'administrador') {
-      renderAdministradorDashboard(session);
-      document.getElementById('user-name').textContent = session.nome;
-      document.getElementById('btn-logout').addEventListener('click', () => {
-        clearSession();
-        window.location.href = pageUrl('login', tipo);
-      });
+    if (tipo === 'admin' && !session.perfil) {
+      window.location.href = pageUrl('login', 'admin');
       return;
     }
 
-    renderAdminModules(session.perfil);
-  }
+    let panelTitle = role.panelTitle;
+    let panelDesc = role.panelDesc;
+    let roleLabel = role.label;
 
-  document.title = `${panelTitle} — SolarVita`;
-  document.getElementById('panel-title').textContent = panelTitle;
-  document.getElementById('panel-desc').textContent = panelDesc;
-  document.getElementById('user-name').textContent = session.nome;
-  document.getElementById('user-cpf').textContent = formatCPF(session.cpf);
-  document.getElementById('user-role').textContent = roleLabel;
+    if (tipo === 'admin' && session.perfil && ADMIN_PROFILES[session.perfil]) {
+      const profile = ADMIN_PROFILES[session.perfil];
+      panelTitle = profile.panelTitle;
+      panelDesc = profile.panelDesc;
+      roleLabel = profile.label;
 
-  if (tipo === 'admin' && session.whatsapp) {
-    document.getElementById('user-whatsapp-row').hidden = false;
-    document.getElementById('user-whatsapp').textContent = formatWhatsApp(session.whatsapp);
-  }
+      if (session.perfil === 'vendedor') {
+        await renderVendedorDashboard(session);
+        document.getElementById('user-name').textContent = session.nome;
+        document.getElementById('btn-logout').addEventListener('click', async () => {
+          await clearSessionAsync();
+          window.location.href = pageUrl('login', tipo);
+        });
+        return;
+      }
 
-  if (tipo === 'admin' && session.nascimento) {
-    document.getElementById('user-nascimento-row').hidden = false;
-    document.getElementById('user-nascimento').textContent = formatBirthDate(session.nascimento);
-  }
+      if (session.perfil === 'administrador') {
+        await renderAdministradorDashboard(session);
+        document.getElementById('user-name').textContent = session.nome;
+        document.getElementById('btn-logout').addEventListener('click', async () => {
+          await clearSessionAsync();
+          window.location.href = pageUrl('login', tipo);
+        });
+        return;
+      }
 
-  document.getElementById('btn-logout').addEventListener('click', () => {
-    clearSession();
-    window.location.href = pageUrl('login', tipo);
+      renderAdminModules(session.perfil);
+    }
+
+    document.title = `${panelTitle} — SolarVita`;
+    document.getElementById('panel-title').textContent = panelTitle;
+    document.getElementById('panel-desc').textContent = panelDesc;
+    document.getElementById('user-name').textContent = session.nome;
+    document.getElementById('user-cpf').textContent = formatCPF(session.cpf);
+    document.getElementById('user-role').textContent = roleLabel;
+
+    if (tipo === 'admin' && session.whatsapp) {
+      document.getElementById('user-whatsapp-row').hidden = false;
+      document.getElementById('user-whatsapp').textContent = formatWhatsApp(session.whatsapp);
+    }
+
+    if (tipo === 'admin' && session.nascimento) {
+      document.getElementById('user-nascimento-row').hidden = false;
+      document.getElementById('user-nascimento').textContent = formatBirthDate(session.nascimento);
+    }
+
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await clearSessionAsync();
+      window.location.href = pageUrl('login', tipo);
+    });
+  })().catch((error) => {
+    console.error(error);
+    window.location.href = pageUrl('login', getTipo());
   });
 }
 
 function initClientesPage() {
-  const session = getSession();
-  let tipo = getTipo();
+  (async () => {
+    if (usesDatabase()) {
+      await refreshSession();
+    }
 
-  if (!session) {
+    const session = getSession();
+    let tipo = getTipo();
+
+    if (!session) {
+      window.location.href = pageUrl('login', 'admin');
+      return;
+    }
+
+    if (session.tipo === 'admin' && tipo !== 'admin') {
+      window.location.replace(pageUrl('clientes', 'admin'));
+      return;
+    }
+
+    if (session.tipo !== 'admin' || session.perfil !== 'vendedor') {
+      window.location.href = pageUrl('painel', session.tipo || tipo);
+      return;
+    }
+
+    tipo = 'admin';
+
+    document.getElementById('user-name').textContent = session.nome;
+    await renderVendedorClientesPage(session);
+
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await clearSessionAsync();
+      window.location.href = pageUrl('login', tipo);
+    });
+  })().catch((error) => {
+    console.error(error);
     window.location.href = pageUrl('login', 'admin');
-    return;
-  }
-
-  if (session.tipo === 'admin' && tipo !== 'admin') {
-    window.location.replace(pageUrl('clientes', 'admin'));
-    return;
-  }
-
-  if (session.tipo !== 'admin' || session.perfil !== 'vendedor') {
-    window.location.href = pageUrl('painel', session.tipo || tipo);
-    return;
-  }
-
-  tipo = 'admin';
-
-  document.getElementById('user-name').textContent = session.nome;
-  renderVendedorClientesPage(session);
-
-  document.getElementById('btn-logout').addEventListener('click', () => {
-    clearSession();
-    window.location.href = pageUrl('login', tipo);
   });
 }

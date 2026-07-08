@@ -2067,8 +2067,20 @@ function initRegistrarCliente() {
       accuracy: loc.accuracy
     };
 
-    VENDEDOR_CLIENTES.unshift(cliente);
-    saveVendedorClientes();
+    if (SOLARVITA_CONFIG.useDatabase) {
+      try {
+        const data = await SolarVitaAPI.createVendedorCliente(cliente);
+        VENDEDOR_CLIENTES.unshift(data.cliente);
+      } catch (error) {
+        showModalAlert(form, error.message || 'Não foi possível salvar o cliente.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Salvar cliente';
+        return;
+      }
+    } else {
+      VENDEDOR_CLIENTES.unshift(cliente);
+      saveVendedorClientes();
+    }
 
     const visita = {
       cliente: nome,
@@ -2107,6 +2119,17 @@ function saveVendedorClientes() {
 }
 
 let VENDEDOR_CLIENTES = loadVendedorClientes() || [...VENDEDOR_CLIENTES_SEED];
+
+async function syncVendedorClientesFromApi() {
+  if (!SOLARVITA_CONFIG.useDatabase) return;
+  try {
+    const data = await SolarVitaAPI.getVendedorClientes();
+    VENDEDOR_CLIENTES = data.clientes || [];
+  } catch (error) {
+    console.error(error);
+    VENDEDOR_CLIENTES = [];
+  }
+}
 
 let VENDEDOR_VISITAS = DEMO?.visitas ? [...DEMO.visitas] : [];
 
@@ -2526,7 +2549,9 @@ const STATUS_LABELS = {
   prospectado: { label: 'Prospectado', class: 'status-prospectado' }
 };
 
-function renderVendedorDashboard(session) {
+async function renderVendedorDashboard(session) {
+  await syncVendedorClientesFromApi();
+
   const defaultPanel = document.getElementById('panel-default');
   const vendedorPanel = document.getElementById('panel-vendedor');
 
@@ -2832,7 +2857,9 @@ function initVendedorMap() {
   setTimeout(() => vendedorMap.invalidateSize(), 200);
 }
 
-function renderVendedorClientesPage(session) {
+async function renderVendedorClientesPage(session) {
+  await syncVendedorClientesFromApi();
+
   const panel = document.getElementById('panel-clientes');
   if (!panel) return;
 

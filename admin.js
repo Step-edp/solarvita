@@ -158,9 +158,9 @@ function handleAdminPanelClick(event) {
   if (approveBtn) {
     const cpf = approveBtn.dataset.approveCadastro;
     const perfil = approveBtn.dataset.perfil;
-    if (setCadastroStatus(cpf, perfil, 'aprovado')) {
-      renderAdministradorDashboard(adminSessionRef);
-    }
+    setCadastroStatus(cpf, perfil, 'aprovado')
+      .then(() => renderAdministradorDashboard(adminSessionRef))
+      .catch((error) => alert(error.message || 'Não foi possível aprovar.'));
     return;
   }
 
@@ -170,13 +170,14 @@ function handleAdminPanelClick(event) {
     const perfil = rejectBtn.dataset.perfil;
     const nome = rejectBtn.closest('tr')?.querySelector('strong')?.textContent || 'este usuário';
     if (confirm(`Rejeitar o cadastro de ${nome}?`)) {
-      setCadastroStatus(cpf, perfil, 'rejeitado');
-      renderAdministradorDashboard(adminSessionRef);
+      setCadastroStatus(cpf, perfil, 'rejeitado')
+        .then(() => renderAdministradorDashboard(adminSessionRef))
+        .catch((error) => alert(error.message || 'Não foi possível rejeitar.'));
     }
   }
 }
 
-function renderAdministradorDashboard(session) {
+async function renderAdministradorDashboard(session) {
   const defaultPanel = document.getElementById('panel-default');
   const adminPanel = document.getElementById('panel-admin');
   if (!adminPanel) return;
@@ -192,7 +193,7 @@ function renderAdministradorDashboard(session) {
   adminPanel.hidden = false;
   document.title = 'Painel do Administrador — SolarVita';
 
-  const pendentes = getPendingCadastros();
+  const pendentes = await getPendingCadastros();
   const { colaboradores, totalAdiadas, totalDias, totalVezes } = getResumoEquipe();
   const colaboradoresComAdiadas = colaboradores.filter((c) => c.metricas.qtdAdiadas > 0).length;
 

@@ -4,10 +4,13 @@
   "private": true,
   "description": "SolarVita — landing page e paineis de energia solar",
   "scripts": {
-    "start": "serve . -l tcp://0.0.0.0:${PORT:-8080}"
+    "start": "node server/index.js"
   },
   "dependencies": {
-    "serve": "^14.2.4"
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
   },
   "engines": {
     "node": ">=18"
