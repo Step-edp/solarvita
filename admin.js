@@ -354,7 +354,7 @@ async function renderAdministradorDashboard(session) {
     <div class="admin-header">
       <div>
         <h1>Painel do Administrador</h1>
-        <p>Olá, <strong>${session.nome}</strong> — gerencie cadastros, usuários e acompanhe a equipe</p>
+        <p>Olá, <strong>${getPrimeiroNome(session.nome)}</strong> — gerencie cadastros, usuários e acompanhe a equipe</p>
       </div>
       <a href="/" class="btn btn-outline-light">Voltar ao site</a>
     </div>

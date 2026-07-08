@@ -2591,7 +2591,7 @@ async function renderVendedorDashboard(session) {
     <div class="vendedor-header">
       <div>
         <h1>Painel do Vendedor</h1>
-        <p>Olá, <strong>${session.nome}</strong> — acompanhe suas propostas e visitas</p>
+        <p>Olá, <strong>${getPrimeiroNome(session.nome)}</strong> — acompanhe suas propostas e visitas</p>
       </div>
       <a href="index.html" class="btn btn-outline-light">Voltar ao site</a>
     </div>
@@ -2870,7 +2870,7 @@ async function renderVendedorClientesPage(session) {
       <div>
         <a href="/painel/admin" class="clientes-back-link">← Voltar ao painel</a>
         <h1>Minha base de clientes</h1>
-        <p>Olá, <strong>${session.nome}</strong> — consulte e filtre todos os seus clientes cadastrados</p>
+        <p>Olá, <strong>${getPrimeiroNome(session.nome)}</strong> — consulte e filtre todos os seus clientes cadastrados</p>
       </div>
       <a href="/painel/admin" class="btn btn-primary">+ Registrar cliente</a>
     </div>

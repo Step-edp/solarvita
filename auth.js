@@ -397,6 +397,12 @@ function formatCPF(value) {
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
 
+function getPrimeiroNome(nome) {
+  if (!nome) return '—';
+  const primeiro = String(nome).trim().split(/\s+/)[0];
+  return primeiro || nome;
+}
+
 function validateCPF(cpf) {
   const d = onlyDigits(cpf);
   if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
@@ -864,7 +870,7 @@ function initPainelPage() {
 
       if (session.perfil === 'vendedor') {
         await renderVendedorDashboard(session);
-        document.getElementById('user-name').textContent = session.nome;
+        document.getElementById('user-name').textContent = getPrimeiroNome(session.nome);
         document.getElementById('btn-logout').addEventListener('click', async () => {
           await clearSessionAsync();
           window.location.href = pageUrl('login', tipo);
@@ -874,7 +880,7 @@ function initPainelPage() {
 
       if (session.perfil === 'administrador') {
         await renderAdministradorDashboard(session);
-        document.getElementById('user-name').textContent = session.nome;
+        document.getElementById('user-name').textContent = getPrimeiroNome(session.nome);
         document.getElementById('btn-logout').addEventListener('click', async () => {
           await clearSessionAsync();
           window.location.href = pageUrl('login', tipo);
@@ -888,7 +894,7 @@ function initPainelPage() {
     document.title = `${panelTitle} — SolarVita`;
     document.getElementById('panel-title').textContent = panelTitle;
     document.getElementById('panel-desc').textContent = panelDesc;
-    document.getElementById('user-name').textContent = session.nome;
+    document.getElementById('user-name').textContent = getPrimeiroNome(session.nome);
     document.getElementById('user-cpf').textContent = formatCPF(session.cpf);
     document.getElementById('user-role').textContent = roleLabel;
 
@@ -938,7 +944,7 @@ function initClientesPage() {
 
     tipo = 'admin';
 
-    document.getElementById('user-name').textContent = session.nome;
+    document.getElementById('user-name').textContent = getPrimeiroNome(session.nome);
     await renderVendedorClientesPage(session);
 
     document.getElementById('btn-logout').addEventListener('click', async () => {
