@@ -62,4 +62,38 @@ router.post('/clientes', async (req, res, next) => {
   }
 });
 
+router.delete('/clientes/:id', async (req, res, next) => {
+  try {
+    const cpf = onlyDigits(req.user.cpf);
+    const id = Number.parseInt(req.params.id, 10);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Registro inválido.' });
+    }
+
+    const existing = await query(
+      `SELECT id, dados FROM vendedor_clientes
+       WHERE id = $1 AND vendedor_cpf = $2`,
+      [id, cpf]
+    );
+
+    if (!existing.rows.length) {
+      return res.status(404).json({ error: 'Registro não encontrado.' });
+    }
+
+    if (existing.rows[0].dados?.tipoRegistro !== 'pap') {
+      return res.status(403).json({ error: 'Somente registros PAP podem ser excluídos.' });
+    }
+
+    await query(
+      `DELETE FROM vendedor_clientes WHERE id = $1 AND vendedor_cpf = $2`,
+      [id, cpf]
+    );
+
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;

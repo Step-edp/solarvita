@@ -1812,6 +1812,102 @@ function countArquivos(arquivos) {
   return n;
 }
 
+function isPapCliente(cliente) {
+  return cliente?.tipoRegistro === 'pap';
+}
+
+function renderPapDeleteButton(cliente) {
+  if (!isPapCliente(cliente) || cliente.id == null) return '—';
+  return `
+    <button type="button" class="btn-excluir-pap" data-id="${cliente.id}" title="Excluir PAP" aria-label="Excluir PAP">
+      Excluir
+    </button>
+  `;
+}
+
+function removerVisitasPap(clienteId, cliente) {
+  VENDEDOR_VISITAS = VENDEDOR_VISITAS.filter((visita) => {
+    if (visita.clienteId != null && String(visita.clienteId) === String(clienteId)) {
+      return false;
+    }
+    if (isPapCliente(cliente) && visita.tipoRegistro === 'pap') {
+      return !(visita.cliente === cliente.nome && visita.endereco === cliente.endereco);
+    }
+    return true;
+  });
+}
+
+function rebuildVendedorMapMarkers() {
+  if (!vendedorMap || typeof L === 'undefined') return;
+
+  vendedorMap.eachLayer((layer) => {
+    if (layer instanceof L.Marker) {
+      vendedorMap.removeLayer(layer);
+    }
+  });
+
+  const bounds = [];
+
+  VENDEDOR_VISITAS.forEach((visita) => {
+    if (visita.lat == null || visita.lng == null) return;
+    const marker = L.marker([visita.lat, visita.lng]).addTo(vendedorMap);
+    marker.bindPopup(
+      `<strong>${visita.cliente}</strong><br>${visita.endereco}<br>` +
+      `<small>${visita.carimbo || visita.data}</small>` +
+      (visita.observacao ? `<br><em>${visita.observacao}</em>` : '')
+    );
+    bounds.push([visita.lat, visita.lng]);
+  });
+
+  if (bounds.length) {
+    vendedorMap.fitBounds(bounds, { padding: [40, 40] });
+  }
+}
+
+async function excluirPapCliente(id, triggerBtn) {
+  const cliente = VENDEDOR_CLIENTES.find((item) => String(item.id) === String(id));
+  if (!cliente || !isPapCliente(cliente)) return;
+
+  if (triggerBtn) triggerBtn.disabled = true;
+
+  try {
+    if (SOLARVITA_CONFIG.useDatabase) {
+      await SolarVitaAPI.deleteVendedorCliente(id);
+    }
+
+    VENDEDOR_CLIENTES = VENDEDOR_CLIENTES.filter((item) => String(item.id) !== String(id));
+    saveVendedorClientes();
+    removerVisitasPap(id, cliente);
+
+    if (cliente.status === 'prospectado' && VENDEDOR_STATS.prospectados > 0) {
+      VENDEDOR_STATS.prospectados -= 1;
+    }
+
+    refreshClientesUI();
+    refreshClientesBaseUI();
+    rebuildVendedorMapMarkers();
+  } catch (error) {
+    alert(error.message || 'Não foi possível excluir o PAP.');
+    if (triggerBtn) triggerBtn.disabled = false;
+  }
+}
+
+function initPapDeleteHandlers(root = document) {
+  if (root.dataset.papDeleteBound === 'true') return;
+  root.dataset.papDeleteBound = 'true';
+
+  root.addEventListener('click', (event) => {
+    const btn = event.target.closest('.btn-excluir-pap');
+    if (!btn || !root.contains(btn)) return;
+
+    const id = btn.dataset.id;
+    if (!id) return;
+
+    if (!confirm('Excluir este registro PAP? Esta ação não pode ser desfeita.')) return;
+    excluirPapCliente(id, btn);
+  });
+}
+
 function renderClientesTableRows() {
   return renderClientesBaseTableRows(VENDEDOR_CLIENTES);
 }
@@ -1868,7 +1964,7 @@ function getClientesBaseResumo(list) {
 
 function renderClientesBaseTableRows(clientes, { extended = false } = {}) {
   if (!clientes.length) {
-    const cols = extended ? 8 : 5;
+    const cols = extended ? 9 : 6;
     return `<tr><td colspan="${cols}" class="clientes-empty">Nenhum cliente encontrado.</td></tr>`;
   }
 
@@ -1885,11 +1981,14 @@ function renderClientesBaseTableRows(clientes, { extended = false } = {}) {
     const arqBadge = arqCount
       ? `<span class="arq-badge" title="${arqCount} arquivo(s) anexado(s)">📎 ${arqCount}</span>`
       : '';
+    const papBadge = isPapCliente(c)
+      ? '<span class="pap-badge">PAP</span> '
+      : '';
 
     if (extended) {
       return `
         <tr>
-          <td><strong>${c.nome}</strong>${arqBadge}</td>
+          <td>${papBadge}<strong>${c.nome}</strong>${arqBadge}</td>
           <td>${formatWhatsAppCliente(c.whatsapp)}</td>
           <td>${c.endereco}</td>
           <td><span class="status-badge ${st.class}">${st.label}</span></td>
@@ -1897,17 +1996,19 @@ function renderClientesBaseTableRows(clientes, { extended = false } = {}) {
           <td>${c.tipoRetornoLabel || '—'}</td>
           <td class="col-registro">${registro}${loc ? `<br>${loc}` : ''}</td>
           <td>${obs}</td>
+          <td class="col-acoes">${renderPapDeleteButton(c)}</td>
         </tr>
       `;
     }
 
     return `
       <tr>
-        <td><strong>${c.nome}</strong>${arqBadge}</td>
+        <td>${papBadge}<strong>${c.nome}</strong>${arqBadge}</td>
         <td>${c.endereco}</td>
         <td><span class="status-badge ${st.class}">${st.label}</span></td>
         <td class="col-registro">${registro}${loc !== '—' ? `<br>${loc}` : ''}</td>
         <td>${obs}</td>
+        <td class="col-acoes">${renderPapDeleteButton(c)}</td>
       </tr>
     `;
   }).join('');
@@ -1940,12 +2041,21 @@ function refreshClientesBaseUI() {
 }
 
 function renderVisitasListItems() {
-  return VENDEDOR_VISITAS.map(v => `
-    <li>
-      <strong>${v.cliente}</strong>
-      <span>${v.endereco} · ${v.carimbo || v.data}${v.observacao ? ` · ${v.observacao}` : ''}</span>
+  return VENDEDOR_VISITAS.map((visita) => {
+    const deleteBtn = visita.tipoRegistro === 'pap' && visita.clienteId
+      ? `<button type="button" class="btn-excluir-pap btn-excluir-pap-inline" data-id="${visita.clienteId}" title="Excluir PAP">Excluir</button>`
+      : '';
+
+    return `
+    <li class="visita-item">
+      <div class="visita-item-main">
+        <strong>${visita.cliente}</strong>
+        <span>${visita.endereco} · ${visita.carimbo || visita.data}${visita.observacao ? ` · ${visita.observacao}` : ''}</span>
+      </div>
+      ${deleteBtn}
     </li>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function refreshVisitasUI() {
@@ -2876,6 +2986,7 @@ function initRegistrarPap() {
       try {
         const data = await SolarVitaAPI.createVendedorCliente(registro);
         VENDEDOR_CLIENTES.unshift(data.cliente);
+        registro.id = data.cliente.id;
       } catch (error) {
         showModalAlert(form, error.message || 'Não foi possível salvar o PAP.');
         submitBtn.disabled = false;
@@ -2883,12 +2994,15 @@ function initRegistrarPap() {
         return;
       }
     } else {
+      if (!registro.id) registro.id = `local-${Date.now()}`;
       VENDEDOR_CLIENTES.unshift(registro);
       saveVendedorClientes();
     }
 
     const visita = {
       cliente: registro.nome,
+      clienteId: registro.id,
+      tipoRegistro: 'pap',
       endereco,
       lat: registro.lat,
       lng: registro.lng,
@@ -3229,6 +3343,7 @@ async function renderVendedorDashboard(session) {
   initRegistrarCliente();
   initAgenda(new Date());
   initVendedorMap();
+  initPapDeleteHandlers(vendedorPanel);
 }
 
 function initVendedorMap() {
@@ -3312,6 +3427,7 @@ async function renderVendedorClientesPage(session) {
               <th>Tipo de retorno</th>
               <th>Registro / Local</th>
               <th>Observação</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody id="clientes-base-tbody"></tbody>
@@ -3321,6 +3437,7 @@ async function renderVendedorClientesPage(session) {
   `;
 
   refreshClientesBaseUI();
+  initPapDeleteHandlers(panel);
 
   document.getElementById('clientes-busca')?.addEventListener('input', refreshClientesBaseUI);
   document.getElementById('clientes-filtro-status')?.addEventListener('change', refreshClientesBaseUI);

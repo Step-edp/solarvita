@@ -76,5 +76,11 @@ const SolarVitaAPI = {
       method: 'POST',
       body: dados
     });
+  },
+
+  deleteVendedorCliente(id) {
+    return this.request(`/vendedor/clientes/${id}`, {
+      method: 'DELETE'
+    });
   }
 };
