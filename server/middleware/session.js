@@ -10,7 +10,7 @@ function getSessionToken(req) {
 }
 
 async function loadSessionUser(token) {
-  if (!token) return null;
+  if (!token || !/^[0-9a-f-]{36}$/i.test(token)) return null;
 
   const result = await query(
     `SELECT u.*
