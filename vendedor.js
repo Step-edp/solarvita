@@ -1816,15 +1816,6 @@ function isPapCliente(cliente) {
   return cliente?.tipoRegistro === 'pap';
 }
 
-function renderPapDeleteButton(cliente) {
-  if (!isPapCliente(cliente) || cliente.id == null) return '—';
-  return `
-    <button type="button" class="btn-excluir-pap" data-id="${cliente.id}" title="Excluir PAP" aria-label="Excluir PAP">
-      Excluir
-    </button>
-  `;
-}
-
 function removerVisitasPap(clienteId, cliente) {
   VENDEDOR_VISITAS = VENDEDOR_VISITAS.filter((visita) => {
     if (visita.clienteId != null && String(visita.clienteId) === String(clienteId)) {
