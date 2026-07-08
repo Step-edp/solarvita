@@ -780,6 +780,10 @@ body.auth-page {
   background: rgba(0, 27, 77, 0.06);
 }
 
+.btn-registrar-pap {
+  font-weight: 600;
+}
+
 .admin-table-cadastros td,
 .admin-table-cadastros th {
   vertical-align: middle;

@@ -1921,8 +1921,34 @@ function clearModalAlert(form) {
   }
 }
 
+function abrirModalRegistrarCliente(form, modal, submitBtn, dataRetornoPicker, options = {}) {
+  modal.hidden = false;
+  document.body.classList.add('modal-open');
+  clearModalAlert(form);
+  resetFilePreviews(form);
+  resetContasLuz(form);
+  resetDadosConsumo(form);
+  resetDefinicaoPerfil(form);
+  resetTipoRetorno(form);
+  resetFormAccordion(form);
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Salvar cliente';
+
+  if (options.presetCanalVendedor) {
+    const canalSelect = form.querySelector('#perfil-canal-vendedor');
+    if (canalSelect) {
+      canalSelect.value = options.presetCanalVendedor;
+      updateCanalVendedorOutro(form);
+    }
+    expandAccordionPanel(form, 'definicao-perfil');
+  }
+
+  form.querySelector('#cliente-nome').focus();
+}
+
 function initRegistrarCliente() {
   const btn = document.getElementById('btn-registrar-cliente');
+  const btnPap = document.getElementById('btn-registrar-pap');
   const modal = document.getElementById('modal-registrar-cliente');
   const form = document.getElementById('form-registrar-cliente');
   const btnFechar = document.getElementById('modal-fechar');
@@ -1939,18 +1965,13 @@ function initRegistrarCliente() {
   const dataRetornoPicker = initModernDatePicker(form.querySelector('[data-date-picker]'));
 
   btn.addEventListener('click', () => {
-    modal.hidden = false;
-    document.body.classList.add('modal-open');
-    clearModalAlert(form);
-    resetFilePreviews(form);
-    resetContasLuz(form);
-    resetDadosConsumo(form);
-    resetDefinicaoPerfil(form);
-    resetTipoRetorno(form);
-    resetFormAccordion(form);
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Salvar cliente';
-    form.querySelector('#cliente-nome').focus();
+    abrirModalRegistrarCliente(form, modal, submitBtn, dataRetornoPicker);
+  });
+
+  btnPap?.addEventListener('click', () => {
+    abrirModalRegistrarCliente(form, modal, submitBtn, dataRetornoPicker, {
+      presetCanalVendedor: 'pap-street'
+    });
   });
 
   function fecharModal() {
@@ -2744,6 +2765,9 @@ async function renderPainelOperacional(session) {
           <button type="button" id="btn-registrar-cliente" class="btn btn-primary btn-registrar">
             <span>+</span> Cadastrar cliente
           </button>
+          <button type="button" id="btn-registrar-pap" class="btn btn-outline-light btn-registrar-pap">
+            <span>+</span> Registrar PAP
+          </button>
           <a href="/clientes/admin" class="btn btn-outline-light">Minha base de clientes</a>
         </div>
       </div>
@@ -2787,6 +2811,9 @@ async function renderVendedorDashboard(session) {
     <div class="vendedor-top-bar">
       <button type="button" id="btn-registrar-cliente" class="btn btn-primary btn-registrar">
         <span>+</span> Registrar cliente
+      </button>
+      <button type="button" id="btn-registrar-pap" class="btn btn-outline-light btn-registrar-pap">
+        <span>+</span> Registrar PAP
       </button>
       <a href="/clientes/admin" class="btn btn-outline-light btn-base-clientes">
         Minha base de clientes
