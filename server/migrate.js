@@ -19,6 +19,10 @@ async function migrate() {
     )
   `);
 
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'aprovado'`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS aprovado_em TIMESTAMPTZ`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS rejeitado_em TIMESTAMPTZ`);
+
   await query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_cpf_tipo_perfil_idx
     ON users (cpf, tipo, COALESCE(perfil, ''))
