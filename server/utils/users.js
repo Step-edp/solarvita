@@ -4,6 +4,23 @@ function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+function toIsoDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === 'string') return value.slice(0, 10);
+  return null;
+}
+
+function toIsoDateTime(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toISOString();
+  }
+  return null;
+}
+
 function mapUserRow(row) {
   if (!row) return null;
   return {
@@ -14,11 +31,11 @@ function mapUserRow(row) {
     tipo: row.tipo,
     perfil: row.perfil || null,
     whatsapp: row.whatsapp || null,
-    nascimento: row.nascimento ? row.nascimento.toISOString().slice(0, 10) : null,
+    nascimento: toIsoDate(row.nascimento),
     status: row.status,
-    criadoEm: row.criado_em ? row.criado_em.toISOString() : null,
-    aprovadoEm: row.aprovado_em ? row.aprovado_em.toISOString() : null,
-    rejeitadoEm: row.rejeitado_em ? row.rejeitado_em.toISOString() : null
+    criadoEm: toIsoDateTime(row.criado_em),
+    aprovadoEm: toIsoDateTime(row.aprovado_em),
+    rejeitadoEm: toIsoDateTime(row.rejeitado_em)
   };
 }
 
