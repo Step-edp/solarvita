@@ -76,6 +76,14 @@ const ADMIN_PROFILES = {
 
 const STORAGE_KEY = 'solarvita_users';
 const SESSION_KEY = 'solarvita_session';
+const DATA_VERSION_KEY = 'solarvita_data_version';
+const DATA_VERSION = 2;
+
+const DEMO_CPFS = new Set([
+  '11144477735',
+  '52998224725',
+  '39053344705'
+]);
 
 const SEED_ADMIN = {
   nome: 'Administrador',
@@ -109,6 +117,8 @@ function upsertAdminUser(userData) {
 }
 
 function seedPendingAdminUser(userData) {
+  if (!SOLARVITA_CONFIG.useDemoData) return;
+
   const users = getUsersRaw();
   const exists = users.some(u =>
     u.cpf === userData.cpf && u.tipo === 'admin' && u.perfil === userData.perfil
@@ -118,6 +128,22 @@ function seedPendingAdminUser(userData) {
     users.push({ ...userData, criadoEm: userData.criadoEm || new Date().toISOString() });
     saveUsers(users);
   }
+}
+
+function cleanupLegacyDemoData() {
+  const version = localStorage.getItem(DATA_VERSION_KEY);
+  if (version === String(DATA_VERSION)) return;
+
+  const users = getUsersRaw().filter((user) => {
+    if (user.cpf === SEED_ADMIN.cpf && user.tipo === 'admin' && user.perfil === 'administrador') {
+      return true;
+    }
+    return !DEMO_CPFS.has(user.cpf);
+  });
+
+  saveUsers(users);
+  localStorage.removeItem('solarvita_vendedor_clientes');
+  localStorage.setItem(DATA_VERSION_KEY, String(DATA_VERSION));
 }
 
 function getPendingCadastros() {
@@ -140,7 +166,9 @@ function setCadastroStatus(cpf, perfil, status) {
 }
 
 function initAuthData() {
+  cleanupLegacyDemoData();
   upsertAdminUser(SEED_ADMIN);
+
   if (SOLARVITA_CONFIG.useDemoData && typeof SOLARVITA_DEMO !== 'undefined' && SOLARVITA_DEMO.seedVendedor) {
     upsertAdminUser(SOLARVITA_DEMO.seedVendedor);
   }
@@ -478,6 +506,7 @@ function initCadastroPage() {
 
   setupCPFInput(cpfInput);
   document.querySelectorAll('.password-toggle').forEach(setupPasswordToggle);
+  clearBirthDateLimits(document.getElementById('nascimento'));
   const perfilSelect = setupAdminPerfilField(tipo);
   const adminFields = setupAdminExtraFields(tipo);
 
