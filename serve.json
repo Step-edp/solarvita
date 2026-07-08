@@ -1,6 +1,14 @@
 {
   "cleanUrls": false,
+  "directoryListing": false,
+  "unlisted": [
+    "node_modules",
+    ".nixpacks",
+    "deploy",
+    "scripts"
+  ],
   "rewrites": [
+    { "source": "/", "destination": "/index.html" },
     { "source": "/login/:tipo", "destination": "/login.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/cadastro/:tipo", "destination": "/cadastro.html" },
