@@ -4,5 +4,6 @@
 const SOLARVITA_CONFIG = {
   ambiente: 'teste',
   useDemoData: false,
-  useDatabase: true
+  useDatabase: true,
+  appUrl: 'https://solarvita-production.up.railway.app'
 };

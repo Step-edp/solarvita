@@ -103,6 +103,42 @@ function usesDatabase() {
   return Boolean(SOLARVITA_CONFIG.useDatabase);
 }
 
+function getAppOrigin() {
+  if (!SOLARVITA_CONFIG.appUrl) return window.location.origin;
+  try {
+    return new URL(SOLARVITA_CONFIG.appUrl).origin;
+  } catch {
+    return window.location.origin;
+  }
+}
+
+function isStaticAuthHost() {
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') return false;
+  if (host.endsWith('.railway.app')) return false;
+  return host.endsWith('github.io') || !usesDatabase();
+}
+
+async function ensureAuthUsesDatabase() {
+  if (isStaticAuthHost() && SOLARVITA_CONFIG.appUrl) {
+    const target = new URL(SOLARVITA_CONFIG.appUrl);
+    target.pathname = window.location.pathname;
+    target.search = window.location.search;
+    window.location.replace(target.href);
+    return false;
+  }
+
+  if (!usesDatabase()) return true;
+
+  try {
+    const response = await fetch('/api/health', { credentials: 'include' });
+    const data = await response.json();
+    return Boolean(response.ok && data.ok && data.database);
+  } catch {
+    return false;
+  }
+}
+
 async function refreshSession() {
   if (!usesDatabase()) return getLocalSession();
   const data = await SolarVitaAPI.me();
@@ -174,8 +210,13 @@ function getPendingCadastrosLocal() {
 
 async function getPendingCadastros() {
   if (usesDatabase()) {
-    const data = await SolarVitaAPI.getPendingCadastros();
-    return data.cadastros;
+    try {
+      const data = await SolarVitaAPI.getPendingCadastros();
+      return data.cadastros || [];
+    } catch (error) {
+      console.error('Erro ao carregar cadastros pendentes:', error);
+      throw error;
+    }
   }
   return getPendingCadastrosLocal();
 }
@@ -496,89 +537,110 @@ function findUserForLogin(cpf, senha, preferredTipo) {
 }
 
 function initLoginPage() {
-  const tipo = getTipo();
-  const role = ROLES[tipo];
-
-  document.title = `${role.loginTitle} — SolarVita`;
-  document.getElementById('auth-badge').textContent = `${role.icon} ${role.label}`;
-  document.getElementById('auth-title').textContent = role.loginTitle;
-  document.getElementById('auth-subtitle').textContent = role.loginSubtitle;
-  document.getElementById('link-cadastro').href = pageUrl('cadastro', tipo);
-
-  const form = document.getElementById('login-form');
-  const alert = document.getElementById('auth-alert');
-  const cpfInput = document.getElementById('cpf');
-
-  setupCPFInput(cpfInput);
-  setupPasswordToggle(document.querySelector('.password-toggle'));
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    hideAlert(alert);
-
-    const cpf = onlyDigits(cpfInput.value);
-    const senha = document.getElementById('senha').value;
-
-    if (!validateCPF(cpf)) {
-      cpfInput.classList.add('error');
-      showAlert(alert, 'CPF inválido. Verifique os números digitados.');
-      return;
-    }
-
-    if (!senha) {
-      showAlert(alert, 'Informe sua senha.');
-      return;
-    }
-
-    if (usesDatabase()) {
-      try {
-        const data = await SolarVitaAPI.login(cpf, senha, tipo);
-        setSession(data.user);
-        window.location.href = pageUrl('painel', data.user.tipo);
-      } catch (error) {
-        if (error.code === 'not_found') {
-          showAlert(alert, 'CPF não cadastrado nesta área. Clique em "Cadastre-se" para criar sua conta.');
-          return;
-        }
-        if (error.code === 'wrong_password') {
-          showAlert(alert, 'Senha incorreta. Tente novamente.');
-          return;
-        }
-        if (error.code === 'pending') {
-          window.location.href = pageUrl('cadastro-pendente', 'admin');
-          return;
-        }
-        showAlert(alert, error.message || 'Não foi possível entrar. Tente novamente.');
+  (async () => {
+    const dbReady = await ensureAuthUsesDatabase();
+    if (!dbReady) {
+      const alert = document.getElementById('auth-alert');
+      if (alert && usesDatabase()) {
+        showAlert(alert, 'Não foi possível conectar ao servidor. Tente novamente em instantes.');
       }
       return;
     }
 
-    const result = findUserForLogin(cpf, senha, tipo);
+    const tipo = getTipo();
+    const role = ROLES[tipo];
 
-    if (result.error === 'not_found') {
-      showAlert(alert, 'CPF não cadastrado nesta área. Clique em "Cadastre-se" para criar sua conta.');
-      return;
-    }
+    document.title = `${role.loginTitle} — SolarVita`;
+    document.getElementById('auth-badge').textContent = `${role.icon} ${role.label}`;
+    document.getElementById('auth-title').textContent = role.loginTitle;
+    document.getElementById('auth-subtitle').textContent = role.loginSubtitle;
+    document.getElementById('link-cadastro').href = pageUrl('cadastro', tipo);
 
-    if (result.error === 'wrong_password') {
-      showAlert(alert, 'Senha incorreta. Tente novamente.');
-      return;
-    }
+    const form = document.getElementById('login-form');
+    const alert = document.getElementById('auth-alert');
+    const cpfInput = document.getElementById('cpf');
 
-    const user = result.user;
+    setupCPFInput(cpfInput);
+    setupPasswordToggle(document.querySelector('.password-toggle'));
 
-    if (user.tipo === 'admin' && !isAdminApproved(user)) {
-      window.location.href = pageUrl('cadastro-pendente', 'admin');
-      return;
-    }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideAlert(alert);
 
-    setSession(user);
-    window.location.href = pageUrl('painel', user.tipo);
-  });
+      const cpf = onlyDigits(cpfInput.value);
+      const senha = document.getElementById('senha').value;
+
+      if (!validateCPF(cpf)) {
+        cpfInput.classList.add('error');
+        showAlert(alert, 'CPF inválido. Verifique os números digitados.');
+        return;
+      }
+
+      if (!senha) {
+        showAlert(alert, 'Informe sua senha.');
+        return;
+      }
+
+      if (usesDatabase()) {
+        try {
+          const data = await SolarVitaAPI.login(cpf, senha, tipo);
+          setSession(data.user);
+          window.location.href = pageUrl('painel', data.user.tipo);
+        } catch (error) {
+          if (error.code === 'not_found') {
+            showAlert(alert, 'CPF não cadastrado nesta área. Clique em "Cadastre-se" para criar sua conta.');
+            return;
+          }
+          if (error.code === 'wrong_password') {
+            showAlert(alert, 'Senha incorreta. Tente novamente.');
+            return;
+          }
+          if (error.code === 'pending') {
+            window.location.href = pageUrl('cadastro-pendente', 'admin');
+            return;
+          }
+          showAlert(alert, error.message || 'Não foi possível entrar. Tente novamente.');
+        }
+        return;
+      }
+
+      const result = findUserForLogin(cpf, senha, tipo);
+
+      if (result.error === 'not_found') {
+        showAlert(alert, 'CPF não cadastrado nesta área. Clique em "Cadastre-se" para criar sua conta.');
+        return;
+      }
+
+      if (result.error === 'wrong_password') {
+        showAlert(alert, 'Senha incorreta. Tente novamente.');
+        return;
+      }
+
+      const user = result.user;
+
+      if (user.tipo === 'admin' && !isAdminApproved(user)) {
+        window.location.href = pageUrl('cadastro-pendente', 'admin');
+        return;
+      }
+
+      setSession(user);
+      window.location.href = pageUrl('painel', user.tipo);
+    });
+  })();
 }
 
 function initCadastroPage() {
-  const tipo = getTipo();
+  (async () => {
+    const dbReady = await ensureAuthUsesDatabase();
+    if (!dbReady) {
+      const alert = document.getElementById('auth-alert');
+      if (alert && usesDatabase()) {
+        showAlert(alert, 'Não foi possível conectar ao servidor. Tente novamente em instantes.');
+      }
+      return;
+    }
+
+    const tipo = getTipo();
   const role = ROLES[tipo];
 
   document.title = `${role.cadastroTitle} — SolarVita`;
@@ -721,6 +783,7 @@ function initCadastroPage() {
       window.location.href = pageUrl('painel', tipo);
     }, 1200);
   });
+  })();
 }
 
 function renderAdminModules(perfil) {

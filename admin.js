@@ -193,15 +193,20 @@ async function renderAdministradorDashboard(session) {
   adminPanel.hidden = false;
   document.title = 'Painel do Administrador — SolarVita';
 
-  const pendentes = await getPendingCadastros();
+  const pendentes = await getPendingCadastros().catch((error) => {
+    console.error(error);
+    return { error: error.message || 'Não foi possível carregar os cadastros pendentes.' };
+  });
+  const pendentesList = Array.isArray(pendentes) ? pendentes : [];
+  const pendentesError = Array.isArray(pendentes) ? null : pendentes.error;
   const { colaboradores, totalAdiadas, totalDias, totalVezes } = getResumoEquipe();
   const colaboradoresComAdiadas = colaboradores.filter((c) => c.metricas.qtdAdiadas > 0).length;
 
   if (!adminInitialTabSet) {
-    adminActiveTab = pendentes.length ? 'cadastros' : 'atividades';
+    adminActiveTab = pendentesList.length ? 'cadastros' : 'atividades';
     adminInitialTabSet = true;
   }
-  if (adminActiveTab === 'cadastros' && !pendentes.length) {
+  if (adminActiveTab === 'cadastros' && !pendentesList.length) {
     adminActiveTab = 'atividades';
   }
 
@@ -217,7 +222,7 @@ async function renderAdministradorDashboard(session) {
     <div class="admin-tabs">
       <button type="button" class="admin-tab ${adminActiveTab === 'cadastros' ? 'active' : ''}" data-admin-tab="cadastros">
         Cadastros pendentes
-        ${pendentes.length ? `<span class="admin-tab-badge">${pendentes.length}</span>` : ''}
+        ${pendentesList.length ? `<span class="admin-tab-badge">${pendentesList.length}</span>` : ''}
       </button>
       <button type="button" class="admin-tab ${adminActiveTab === 'atividades' ? 'active' : ''}" data-admin-tab="atividades">
         Atividades adiadas
@@ -228,7 +233,7 @@ async function renderAdministradorDashboard(session) {
       <div class="admin-stats-grid admin-stats-grid-compact">
         <div class="admin-stat-card admin-stat-card-alert">
           <span class="admin-stat-label">Aguardando aprovação</span>
-          <span class="admin-stat-value">${pendentes.length}</span>
+          <span class="admin-stat-value">${pendentesList.length}</span>
           <span class="admin-stat-extra">Solicitações de acesso</span>
         </div>
       </div>
@@ -236,6 +241,7 @@ async function renderAdministradorDashboard(session) {
       <section class="vendedor-section admin-section">
         <h2>Solicitações de cadastro</h2>
         <p class="section-desc">Revise os dados e aprove ou rejeite novos acessos administrativos.</p>
+        ${pendentesError ? `<div class="auth-alert show error">${pendentesError}</div>` : ''}
         <div class="admin-table-wrap">
           <table class="admin-table admin-table-cadastros">
             <thead>
@@ -250,7 +256,7 @@ async function renderAdministradorDashboard(session) {
               </tr>
             </thead>
             <tbody>
-              ${renderCadastrosPendentesRows(pendentes)}
+              ${renderCadastrosPendentesRows(pendentesList)}
             </tbody>
           </table>
         </div>
