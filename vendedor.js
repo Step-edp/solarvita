@@ -2742,7 +2742,7 @@ async function renderPainelOperacional(session) {
         <p>${profile.panelDesc}</p>
         <div class="panel-operacional-actions">
           <button type="button" id="btn-registrar-cliente" class="btn btn-primary btn-registrar">
-            <span>+</span> Cadastrar
+            <span>+</span> Cadastrar cliente
           </button>
           <a href="/clientes/admin" class="btn btn-outline-light">Minha base de clientes</a>
         </div>
