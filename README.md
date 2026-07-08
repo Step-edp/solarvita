@@ -82,20 +82,20 @@ Enquanto os workflows nao estiverem ativos, use `publicar-producao.ps1` para pro
 
 ## Deploy (Railway)
 
-Repositorio: **https://github.com/Step-edp/solarvita**
+Painel: **https://railway.com/project/895431ef-103e-4b78-a0b1-c7704cf36dcd**
 
-| Ambiente | Branch | Deploy |
-|----------|--------|--------|
-| **Teste** | `teste` | Automatico a cada push |
-| **Producao** | `producao` | Manual (somente quando voce solicitar) |
+| Ambiente | URL | Branch | Deploy |
+|----------|-----|--------|--------|
+| **Teste** | https://solarvita-production.up.railway.app | `teste` | Automatico a cada push |
+| **Producao** | https://solarvita-producao-producao.up.railway.app | `producao` | Manual |
 
-### Configurar no Railway (uma vez)
+### Publicar producao no Railway (manual)
 
-1. Acesse https://railway.com/new
-2. **Deploy from GitHub repo** → `Step-edp/solarvita`
-3. Ambiente **teste**: branch `teste`, **Auto Deploy** ligado
-4. Crie ambiente **producao**: branch `producao`, **Auto Deploy** desligado
-5. Deploy de producao: botao **Deploy** no painel Railway
+```powershell
+.\scripts\publicar-railway-producao.ps1
+```
+
+Ou no painel Railway: ambiente **producao** → servico **solarvita-producao** → **Deploy**.
 
 O site sobe com `npm start` (servidor estatico na porta `PORT`).
 
