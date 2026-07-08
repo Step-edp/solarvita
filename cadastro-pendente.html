@@ -28,7 +28,7 @@
       <h1>Cadastro pendente de aprovação do administrador</h1>
       <p class="pendente-message">Você será avisado por e-mail sobre a resposta.</p>
       <div class="pendente-actions">
-        <a id="link-login" href="/login?tipo=admin" class="btn btn-primary btn-full">Voltar ao login</a>
+        <a id="link-login" href="/login/admin" class="btn btn-primary btn-full">Voltar ao login</a>
         <a href="index.html" class="pendente-link">Ir para o site</a>
       </div>
     </div>
@@ -36,7 +36,7 @@
 
   <script>
     const tipo = new URLSearchParams(window.location.search).get('tipo') || 'admin';
-    document.getElementById('link-login').href = `/login?tipo=${tipo}`;
+    document.getElementById('link-login').href = `/login/${tipo}`;
   </script>
 </body>
 </html>

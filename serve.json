@@ -1,10 +1,15 @@
 {
   "cleanUrls": false,
   "rewrites": [
+    { "source": "/login/:tipo", "destination": "/login.html" },
     { "source": "/login", "destination": "/login.html" },
+    { "source": "/cadastro/:tipo", "destination": "/cadastro.html" },
     { "source": "/cadastro", "destination": "/cadastro.html" },
+    { "source": "/painel/:tipo", "destination": "/painel.html" },
     { "source": "/painel", "destination": "/painel.html" },
+    { "source": "/clientes/:tipo", "destination": "/clientes.html" },
     { "source": "/clientes", "destination": "/clientes.html" },
+    { "source": "/cadastro-pendente/:tipo", "destination": "/cadastro-pendente.html" },
     { "source": "/cadastro-pendente", "destination": "/cadastro-pendente.html" }
   ]
 }

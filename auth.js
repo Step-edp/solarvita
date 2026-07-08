@@ -126,11 +126,14 @@ function getUsersRaw() {
 initAuthData();
 
 function pageUrl(page, tipo, extraParams = {}) {
+  const extras = Object.entries(extraParams).filter(([, value]) => value != null && value !== '');
+  if (tipo && extras.length === 0) {
+    return `/${page}/${tipo}`;
+  }
+
   const params = new URLSearchParams();
   if (tipo) params.set('tipo', tipo);
-  Object.entries(extraParams).forEach(([key, value]) => {
-    if (value != null && value !== '') params.set(key, value);
-  });
+  extras.forEach(([key, value]) => params.set(key, value));
   const query = params.toString();
   return query ? `/${page}?${query}` : `/${page}`;
 }
@@ -351,16 +354,27 @@ function getPerfilFromForm(perfilSelect) {
   return perfilSelect ? perfilSelect.value : null;
 }
 
-function findUserForLogin(cpf, senha, tipo) {
-  const candidates = getUsers().filter(u => u.cpf === cpf && u.tipo === tipo);
-  if (!candidates.length) return { error: 'not_found' };
+function findUserForLogin(cpf, senha, preferredTipo) {
+  const allMatches = getUsers().filter(u => u.cpf === cpf && u.senha === senha);
 
-  const matches = candidates.filter(u => u.senha === senha);
-  if (!matches.length) return { error: 'wrong_password' };
-  if (matches.length === 1) return { user: matches[0] };
+  if (!allMatches.length) {
+    if (getUsers().some(u => u.cpf === cpf)) return { error: 'wrong_password' };
+    return { error: 'not_found' };
+  }
 
-  const approved = matches.find(u => isAdminApproved(u));
-  return { user: approved || matches[0] };
+  if (preferredTipo) {
+    const inArea = allMatches.filter(u => u.tipo === preferredTipo);
+    if (inArea.length === 1) return { user: inArea[0] };
+    if (inArea.length > 1) {
+      const approved = inArea.find(u => isAdminApproved(u));
+      return { user: approved || inArea[0] };
+    }
+  }
+
+  if (allMatches.length === 1) return { user: allMatches[0] };
+
+  const approved = allMatches.find(u => isAdminApproved(u));
+  return { user: approved || allMatches[0] };
 }
 
 function initLoginPage() {
@@ -412,13 +426,13 @@ function initLoginPage() {
 
     const user = result.user;
 
-    if (tipo === 'admin' && !isAdminApproved(user)) {
+    if (user.tipo === 'admin' && !isAdminApproved(user)) {
       window.location.href = pageUrl('cadastro-pendente', 'admin');
       return;
     }
 
     setSession(user);
-    window.location.href = pageUrl('painel', tipo);
+    window.location.href = pageUrl('painel', user.tipo);
   });
 }
 
