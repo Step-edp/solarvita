@@ -317,6 +317,14 @@ function showPendingApproval(tipo) {
   window.location.href = pageUrl('cadastro-pendente', tipo);
 }
 
+function clearBirthDateLimits(input) {
+  if (!input) return;
+  input.removeAttribute('min');
+  input.removeAttribute('max');
+  input.min = '';
+  input.max = '';
+}
+
 function setupAdminExtraFields(tipo) {
   const group = document.getElementById('admin-extra-fields');
   const emailInput = document.getElementById('email');
@@ -330,8 +338,7 @@ function setupAdminExtraFields(tipo) {
     whatsappInput.required = true;
     nascimentoInput.required = true;
     setupWhatsAppInput(whatsappInput);
-    nascimentoInput.removeAttribute('min');
-    nascimentoInput.removeAttribute('max');
+    clearBirthDateLimits(nascimentoInput);
     return { emailInput, whatsappInput, nascimentoInput };
   }
 
@@ -513,7 +520,7 @@ function initCadastroPage() {
 
       if (!validateBirthDate(nascimento)) {
         adminFields.nascimentoInput.classList.add('error');
-        showAlert(alert, 'Informe uma data de nascimento válida (mínimo 18 anos).');
+        showAlert(alert, 'Informe uma data de nascimento válida.');
         return;
       }
     }
