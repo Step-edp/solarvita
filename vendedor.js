@@ -301,10 +301,50 @@ function initModernDatePicker(container) {
   };
 }
 
+function detectMobilePlatform() {
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  return 'desktop';
+}
+
+function getGeoDeniedInstructionsHtml() {
+  const platform = detectMobilePlatform();
+  if (platform === 'ios') {
+    return `
+      <ol class="geo-steps">
+        <li>Abra <strong>Ajustes</strong> do iPhone</li>
+        <li>Toque em <strong>Privacidade e Segurança → Localização</strong></li>
+        <li>Ative <strong>Localização</strong> e permita para o <strong>Safari</strong> (ou Chrome)</li>
+        <li>Volte ao site e toque em <strong>Tentar novamente</strong></li>
+      </ol>
+    `;
+  }
+  if (platform === 'android') {
+    return `
+      <ol class="geo-steps">
+        <li>Toque no ícone de <strong>cadeado</strong> ou <strong>⋮</strong> na barra do Chrome</li>
+        <li>Abra <strong>Permissões</strong> → <strong>Localização</strong></li>
+        <li>Selecione <strong>Permitir</strong></li>
+        <li>Volte ao site e toque em <strong>Tentar novamente</strong></li>
+      </ol>
+    `;
+  }
+  return `
+    <ol class="geo-steps">
+      <li>Clique no ícone de <strong>cadeado</strong> ao lado do endereço do site</li>
+      <li>Em <strong>Localização</strong>, escolha <strong>Permitir</strong></li>
+      <li>Recarregue a página e tente novamente</li>
+    </ol>
+  `;
+}
+
 function getLocalizacaoVendedor() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error('Geolocalização não suportada neste navegador.'));
+      const error = new Error('Geolocalização não suportada neste navegador.');
+      error.code = 'UNSUPPORTED';
+      reject(error);
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -314,14 +354,17 @@ function getLocalizacaoVendedor() {
         accuracy: Math.round(pos.coords.accuracy)
       }),
       (err) => {
+        const codeMap = { 1: 'PERMISSION_DENIED', 2: 'UNAVAILABLE', 3: 'TIMEOUT' };
         const msgs = {
-          1: 'Permissão de localização negada. Ative no navegador para registrar.',
+          1: 'Permissão de localização negada.',
           2: 'Localização indisponível no momento.',
           3: 'Tempo esgotado ao obter localização. Tente novamente.'
         };
-        reject(new Error(msgs[err.code] || 'Não foi possível obter a localização.'));
+        const error = new Error(msgs[err.code] || 'Não foi possível obter a localização.');
+        error.code = codeMap[err.code] || 'UNKNOWN';
+        reject(error);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
   });
 }
@@ -1929,14 +1972,18 @@ function refreshClientesUI() {
   refreshVisitasUI();
 }
 
-function showModalAlert(form, message, type = 'error') {
+function showModalAlert(form, message, type = 'error', options = {}) {
   let el = form.querySelector('.modal-alert');
   if (!el) {
     el = document.createElement('div');
     el.className = 'modal-alert';
     form.prepend(el);
   }
-  el.textContent = message;
+  if (options.html) {
+    el.innerHTML = message;
+  } else {
+    el.textContent = message;
+  }
   el.className = `modal-alert show ${type}`;
 }
 
@@ -1945,6 +1992,7 @@ function clearModalAlert(form) {
   if (el) {
     el.className = 'modal-alert';
     el.textContent = '';
+    el.innerHTML = '';
   }
 }
 
@@ -2082,7 +2130,14 @@ function initRegistrarCliente() {
     try {
       loc = await getLocalizacaoVendedor();
     } catch (err) {
-      showModalAlert(form, err.message);
+      if (err.code === 'PERMISSION_DENIED') {
+        showModalAlert(form, `
+          <strong>Localização bloqueada</strong>
+          ${getGeoDeniedInstructionsHtml()}
+        `, 'error', { html: true });
+      } else {
+        showModalAlert(form, err.message);
+      }
       submitBtn.disabled = false;
       submitBtn.textContent = 'Salvar cliente';
       return;
@@ -2604,56 +2659,75 @@ function buildRegistrarPapModalHtml() {
         <form id="form-registrar-pap" class="modal-form">
           <div id="pap-modal-alert" class="modal-alert"></div>
 
-          <div class="modal-field">
-            <label for="pap-observacao">Observação <span class="req">*</span></label>
-            <textarea id="pap-observacao" rows="3" placeholder="Descreva a visita ou contato PAP" required></textarea>
+          <div id="pap-geo-prompt" class="geo-permission-box">
+            <div class="geo-permission-icon" aria-hidden="true">📍</div>
+            <p class="geo-permission-title">Precisamos da sua localização</p>
+            <p class="geo-permission-desc">O endereço será preenchido automaticamente com base na sua posição atual.</p>
+            <p class="geo-permission-desc">Toque no botão abaixo — o celular vai pedir permissão de localização.</p>
+            <button type="button" id="pap-btn-permitir-loc" class="btn btn-primary btn-full">Permitir localização</button>
+            <div id="pap-geo-denied" class="geo-denied-help" hidden>
+              <p><strong>Localização bloqueada</strong></p>
+              ${getGeoDeniedInstructionsHtml()}
+              <button type="button" id="pap-btn-tentar-loc" class="btn btn-outline btn-full">Tentar novamente</button>
+            </div>
           </div>
 
-          <div class="modal-field">
-            <label for="pap-endereco">Endereço</label>
-            <input type="text" id="pap-endereco" readonly placeholder="Obtendo localização...">
-            <p class="field-hint">Preenchido automaticamente pela sua localização atual.</p>
-            <input type="hidden" id="pap-lat">
-            <input type="hidden" id="pap-lng">
-            <input type="hidden" id="pap-accuracy">
-          </div>
+          <div id="pap-form-fields" hidden>
+            <div class="modal-field">
+              <label for="pap-observacao">Observação <span class="req">*</span></label>
+              <textarea id="pap-observacao" rows="3" placeholder="Descreva a visita ou contato PAP" required></textarea>
+            </div>
 
-          <div class="modal-field">
-            <label for="pap-numero">Número <span class="req">*</span></label>
-            <input type="text" id="pap-numero" placeholder="Ex: 123" required inputmode="numeric">
-          </div>
+            <div class="modal-field">
+              <label for="pap-endereco">Endereço</label>
+              <input type="text" id="pap-endereco" readonly placeholder="Endereço obtido pela localização">
+              <p class="field-hint">Preenchido automaticamente pela sua localização atual.</p>
+              <input type="hidden" id="pap-lat">
+              <input type="hidden" id="pap-lng">
+              <input type="hidden" id="pap-accuracy">
+            </div>
 
-          <button type="submit" class="btn btn-primary btn-full">Salvar PAP</button>
+            <div class="modal-field">
+              <label for="pap-numero">Número <span class="req">*</span></label>
+              <input type="text" id="pap-numero" placeholder="Ex: 123" required inputmode="numeric">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">Salvar PAP</button>
+          </div>
         </form>
       </div>
     </div>
   `;
 }
 
-async function preencherLocalizacaoPap(form) {
-  const enderecoInput = form.querySelector('#pap-endereco');
-  const latInput = form.querySelector('#pap-lat');
-  const lngInput = form.querySelector('#pap-lng');
-  const accuracyInput = form.querySelector('#pap-accuracy');
+function resetPapGeoState(form) {
+  const geoPrompt = form.querySelector('#pap-geo-prompt');
+  const formFields = form.querySelector('#pap-form-fields');
+  const btnPermitir = form.querySelector('#pap-btn-permitir-loc');
+  const geoDenied = form.querySelector('#pap-geo-denied');
 
-  enderecoInput.value = '';
-  enderecoInput.placeholder = 'Obtendo localização...';
-  latInput.value = '';
-  lngInput.value = '';
-  accuracyInput.value = '';
-
-  const loc = await getLocalizacaoVendedor();
-  const endereco = await reverseGeocodeEndereco(loc.lat, loc.lng);
-
-  if (!endereco) {
-    throw new Error('Não foi possível identificar o endereço pela localização.');
+  if (geoPrompt) geoPrompt.hidden = false;
+  if (formFields) formFields.hidden = true;
+  if (btnPermitir) {
+    btnPermitir.hidden = false;
+    btnPermitir.disabled = false;
+    btnPermitir.textContent = 'Permitir localização';
   }
+  if (geoDenied) geoDenied.hidden = true;
+}
 
-  latInput.value = String(loc.lat);
-  lngInput.value = String(loc.lng);
-  accuracyInput.value = String(loc.accuracy);
-  enderecoInput.value = endereco;
-  enderecoInput.placeholder = '';
+function showPapFormFields(form) {
+  const geoPrompt = form.querySelector('#pap-geo-prompt');
+  const formFields = form.querySelector('#pap-form-fields');
+  if (geoPrompt) geoPrompt.hidden = true;
+  if (formFields) formFields.hidden = false;
+}
+
+function showPapGeoDenied(form) {
+  const btnPermitir = form.querySelector('#pap-btn-permitir-loc');
+  const geoDenied = form.querySelector('#pap-geo-denied');
+  if (btnPermitir) btnPermitir.hidden = true;
+  if (geoDenied) geoDenied.hidden = false;
 }
 
 function initRegistrarPap() {
@@ -2661,26 +2735,77 @@ function initRegistrarPap() {
   const modal = document.getElementById('modal-registrar-pap');
   const form = document.getElementById('form-registrar-pap');
   const btnFechar = document.getElementById('modal-pap-fechar');
+  const btnPermitir = form?.querySelector('#pap-btn-permitir-loc');
+  const btnTentar = form?.querySelector('#pap-btn-tentar-loc');
   const submitBtn = form?.querySelector('button[type=submit]');
 
-  if (!btn || !modal || !form || !submitBtn) return;
+  if (!btn || !modal || !form || !submitBtn || !btnPermitir) return;
 
-  btn.addEventListener('click', async () => {
+  async function aplicarLocalizacaoPap(loc) {
+    const enderecoInput = form.querySelector('#pap-endereco');
+    const latInput = form.querySelector('#pap-lat');
+    const lngInput = form.querySelector('#pap-lng');
+    const accuracyInput = form.querySelector('#pap-accuracy');
+
+    enderecoInput.value = '';
+    enderecoInput.placeholder = 'Obtendo localização...';
+
+    const endereco = await reverseGeocodeEndereco(loc.lat, loc.lng);
+    if (!endereco) {
+      throw new Error('Não foi possível identificar o endereço pela localização.');
+    }
+
+    latInput.value = String(loc.lat);
+    lngInput.value = String(loc.lng);
+    accuracyInput.value = String(loc.accuracy);
+    enderecoInput.value = endereco;
+    enderecoInput.placeholder = '';
+  }
+
+  function solicitarLocalizacaoPap(triggerBtn) {
+    clearModalAlert(form);
+    triggerBtn.disabled = true;
+    const labelOriginal = triggerBtn.textContent;
+    triggerBtn.textContent = 'Obtendo localização...';
+
+    // Dispara no clique do usuário — necessário no celular para o navegador pedir permissão
+    getLocalizacaoVendedor()
+      .then((loc) => aplicarLocalizacaoPap(loc))
+      .then(() => {
+        showPapFormFields(form);
+        form.querySelector('#pap-observacao').focus();
+      })
+      .catch((error) => {
+        if (error.code === 'PERMISSION_DENIED') {
+          showPapGeoDenied(form);
+        } else {
+          showModalAlert(form, error.message || 'Não foi possível obter a localização.');
+        }
+      })
+      .finally(() => {
+        triggerBtn.disabled = false;
+        triggerBtn.textContent = labelOriginal;
+      });
+  }
+
+  btn.addEventListener('click', () => {
     modal.hidden = false;
     document.body.classList.add('modal-open');
     clearModalAlert(form);
     form.reset();
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Obtendo localização...';
+    resetPapGeoState(form);
+  });
 
-    try {
-      await preencherLocalizacaoPap(form);
-      form.querySelector('#pap-observacao').focus();
-    } catch (error) {
-      showModalAlert(form, error.message || 'Não foi possível obter a localização.');
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Salvar PAP';
+  btnPermitir.addEventListener('click', () => {
+    solicitarLocalizacaoPap(btnPermitir);
+  });
+
+  btnTentar?.addEventListener('click', () => {
+    const btnPermitirRetry = form.querySelector('#pap-btn-permitir-loc');
+    if (btnPermitirRetry) {
+      btnPermitirRetry.hidden = false;
+      form.querySelector('#pap-geo-denied').hidden = true;
+      solicitarLocalizacaoPap(btnPermitirRetry);
     }
   });
 
@@ -2689,6 +2814,7 @@ function initRegistrarPap() {
     document.body.classList.remove('modal-open');
     form.reset();
     clearModalAlert(form);
+    resetPapGeoState(form);
     submitBtn.disabled = false;
     submitBtn.textContent = 'Salvar PAP';
   }
