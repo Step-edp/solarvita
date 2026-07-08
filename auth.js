@@ -71,6 +71,13 @@ const ADMIN_PROFILES = {
     panelTitle: 'Painel BackOffice',
     panelDesc: 'Suporte operacional, documentação e acompanhamento de processos.',
     modules: ['Processos internos', 'Documentação', 'Suporte operacional', 'Agenda e tarefas']
+  },
+  marketing: {
+    label: 'Marketing',
+    icon: '📣',
+    panelTitle: 'Painel de Marketing',
+    panelDesc: 'Gerencie campanhas, conteúdo e comunicação da marca SolarVita.',
+    modules: ['Campanhas digitais', 'Redes sociais', 'Materiais de apoio', 'Leads e métricas']
   }
 };
 
