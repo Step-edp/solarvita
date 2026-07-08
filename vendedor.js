@@ -326,6 +326,33 @@ function getLocalizacaoVendedor() {
   });
 }
 
+async function reverseGeocodeEndereco(lat, lng) {
+  const url = new URL('https://nominatim.openstreetmap.org/reverse');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('lat', String(lat));
+  url.searchParams.set('lon', String(lng));
+  url.searchParams.set('accept-language', 'pt-BR');
+
+  const response = await fetch(url.toString(), {
+    headers: { 'Accept-Language': 'pt-BR' }
+  });
+
+  if (!response.ok) {
+    throw new Error('Não foi possível obter o endereço pela localização.');
+  }
+
+  const data = await response.json();
+  const address = data.address || {};
+  const partes = [
+    address.road || address.pedestrian || address.footway,
+    address.suburb || address.neighbourhood || address.quarter,
+    address.city || address.town || address.village,
+    address.state
+  ].filter(Boolean);
+
+  return partes.join(', ') || data.display_name || '';
+}
+
 let vendedorMap = null;
 let previewUrls = [];
 
@@ -1948,7 +1975,6 @@ function abrirModalRegistrarCliente(form, modal, submitBtn, dataRetornoPicker, o
 
 function initRegistrarCliente() {
   const btn = document.getElementById('btn-registrar-cliente');
-  const btnPap = document.getElementById('btn-registrar-pap');
   const modal = document.getElementById('modal-registrar-cliente');
   const form = document.getElementById('form-registrar-cliente');
   const btnFechar = document.getElementById('modal-fechar');
@@ -1968,11 +1994,7 @@ function initRegistrarCliente() {
     abrirModalRegistrarCliente(form, modal, submitBtn, dataRetornoPicker);
   });
 
-  btnPap?.addEventListener('click', () => {
-    abrirModalRegistrarCliente(form, modal, submitBtn, dataRetornoPicker, {
-      presetCanalVendedor: 'pap-street'
-    });
-  });
+  initRegistrarPap();
 
   function fecharModal() {
     modal.hidden = true;
@@ -2570,6 +2592,193 @@ const STATUS_LABELS = {
   prospectado: { label: 'Prospectado', class: 'status-prospectado' }
 };
 
+function buildRegistrarPapModalHtml() {
+  return `
+    <div id="modal-registrar-pap" class="modal-registrar" hidden>
+      <div class="modal-overlay"></div>
+      <div class="modal-box">
+        <div class="modal-header">
+          <h2>Registrar PAP</h2>
+          <button type="button" id="modal-pap-fechar" class="modal-close" aria-label="Fechar">&times;</button>
+        </div>
+        <form id="form-registrar-pap" class="modal-form">
+          <div id="pap-modal-alert" class="modal-alert"></div>
+
+          <div class="modal-field">
+            <label for="pap-observacao">Observação <span class="req">*</span></label>
+            <textarea id="pap-observacao" rows="3" placeholder="Descreva a visita ou contato PAP" required></textarea>
+          </div>
+
+          <div class="modal-field">
+            <label for="pap-endereco">Endereço</label>
+            <input type="text" id="pap-endereco" readonly placeholder="Obtendo localização...">
+            <p class="field-hint">Preenchido automaticamente pela sua localização atual.</p>
+            <input type="hidden" id="pap-lat">
+            <input type="hidden" id="pap-lng">
+            <input type="hidden" id="pap-accuracy">
+          </div>
+
+          <div class="modal-field">
+            <label for="pap-numero">Número <span class="req">*</span></label>
+            <input type="text" id="pap-numero" placeholder="Ex: 123" required inputmode="numeric">
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full">Salvar PAP</button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+async function preencherLocalizacaoPap(form) {
+  const enderecoInput = form.querySelector('#pap-endereco');
+  const latInput = form.querySelector('#pap-lat');
+  const lngInput = form.querySelector('#pap-lng');
+  const accuracyInput = form.querySelector('#pap-accuracy');
+
+  enderecoInput.value = '';
+  enderecoInput.placeholder = 'Obtendo localização...';
+  latInput.value = '';
+  lngInput.value = '';
+  accuracyInput.value = '';
+
+  const loc = await getLocalizacaoVendedor();
+  const endereco = await reverseGeocodeEndereco(loc.lat, loc.lng);
+
+  if (!endereco) {
+    throw new Error('Não foi possível identificar o endereço pela localização.');
+  }
+
+  latInput.value = String(loc.lat);
+  lngInput.value = String(loc.lng);
+  accuracyInput.value = String(loc.accuracy);
+  enderecoInput.value = endereco;
+  enderecoInput.placeholder = '';
+}
+
+function initRegistrarPap() {
+  const btn = document.getElementById('btn-registrar-pap');
+  const modal = document.getElementById('modal-registrar-pap');
+  const form = document.getElementById('form-registrar-pap');
+  const btnFechar = document.getElementById('modal-pap-fechar');
+  const submitBtn = form?.querySelector('button[type=submit]');
+
+  if (!btn || !modal || !form || !submitBtn) return;
+
+  btn.addEventListener('click', async () => {
+    modal.hidden = false;
+    document.body.classList.add('modal-open');
+    clearModalAlert(form);
+    form.reset();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Obtendo localização...';
+
+    try {
+      await preencherLocalizacaoPap(form);
+      form.querySelector('#pap-observacao').focus();
+    } catch (error) {
+      showModalAlert(form, error.message || 'Não foi possível obter a localização.');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Salvar PAP';
+    }
+  });
+
+  function fecharModalPap() {
+    modal.hidden = true;
+    document.body.classList.remove('modal-open');
+    form.reset();
+    clearModalAlert(form);
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Salvar PAP';
+  }
+
+  btnFechar.addEventListener('click', fecharModalPap);
+  modal.querySelector('.modal-overlay').addEventListener('click', fecharModalPap);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearModalAlert(form);
+
+    const observacao = form.querySelector('#pap-observacao').value.trim();
+    const enderecoBase = form.querySelector('#pap-endereco').value.trim();
+    const numero = form.querySelector('#pap-numero').value.trim();
+    const lat = form.querySelector('#pap-lat').value;
+    const lng = form.querySelector('#pap-lng').value;
+    const accuracy = form.querySelector('#pap-accuracy').value;
+
+    if (!observacao) {
+      showModalAlert(form, 'Informe a observação.');
+      return;
+    }
+
+    if (!enderecoBase || !lat || !lng) {
+      showModalAlert(form, 'Aguarde a localização ser capturada ou abra o formulário novamente.');
+      return;
+    }
+
+    if (!numero) {
+      showModalAlert(form, 'Informe o número do endereço.');
+      return;
+    }
+
+    const endereco = `${enderecoBase}, ${numero}`;
+    const agora = new Date();
+    const carimbo = formatCarimbo(agora);
+
+    const registro = {
+      nome: `PAP - ${numero}`,
+      endereco,
+      enderecoBase,
+      numero,
+      observacao,
+      tipoRegistro: 'pap',
+      canalVendedor: 'pap-street',
+      canalVendedorLabel: 'PAP Street',
+      status: 'prospectado',
+      data: formatDataHoje(),
+      carimbo,
+      lat: Number(lat),
+      lng: Number(lng),
+      accuracy: Number(accuracy)
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Salvando...';
+
+    if (SOLARVITA_CONFIG.useDatabase) {
+      try {
+        const data = await SolarVitaAPI.createVendedorCliente(registro);
+        VENDEDOR_CLIENTES.unshift(data.cliente);
+      } catch (error) {
+        showModalAlert(form, error.message || 'Não foi possível salvar o PAP.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Salvar PAP';
+        return;
+      }
+    } else {
+      VENDEDOR_CLIENTES.unshift(registro);
+      saveVendedorClientes();
+    }
+
+    const visita = {
+      cliente: registro.nome,
+      endereco,
+      lat: registro.lat,
+      lng: registro.lng,
+      data: formatDataHoje(),
+      carimbo,
+      observacao
+    };
+    VENDEDOR_VISITAS.unshift(visita);
+
+    VENDEDOR_STATS.prospectados += 1;
+    refreshClientesUI();
+    addMarkerToMap(visita);
+    fecharModalPap();
+  });
+}
+
 function buildRegistrarClienteModalHtml() {
   return `
     <div id="modal-registrar-cliente" class="modal-registrar" hidden>
@@ -2773,6 +2982,7 @@ async function renderPainelOperacional(session) {
       </div>
     </div>
     ${buildRegistrarClienteModalHtml()}
+    ${buildRegistrarPapModalHtml()}
   `;
 
   initRegistrarCliente();
@@ -2829,6 +3039,7 @@ async function renderVendedorDashboard(session) {
     </div>
 
     ${buildRegistrarClienteModalHtml()}
+    ${buildRegistrarPapModalHtml()}
 
     <div id="modal-agenda-acao" class="modal-registrar" hidden>
       <div class="modal-overlay"></div>

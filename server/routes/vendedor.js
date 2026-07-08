@@ -35,7 +35,11 @@ router.post('/clientes', async (req, res, next) => {
     const cpf = onlyDigits(req.user.cpf);
     const dados = req.body;
 
-    if (!dados?.nome || !dados?.endereco) {
+    if (dados?.tipoRegistro === 'pap') {
+      if (!dados?.observacao || !dados?.endereco) {
+        return res.status(400).json({ error: 'Dados do PAP incompletos.' });
+      }
+    } else if (!dados?.nome || !dados?.endereco) {
       return res.status(400).json({ error: 'Dados do cliente incompletos.' });
     }
 
