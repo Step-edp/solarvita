@@ -2301,7 +2301,7 @@ function getTrilhaResumo(list) {
 function renderClientesTrilhaHtml(list, activeEtapa = '') {
   const resumo = getTrilhaResumo(list);
 
-  return CLIENTE_TRILHA_ETAPAS.map((etapa, index) => {
+  return CLIENTE_TRILHA_ETAPAS.map((etapa) => {
     const count = resumo[etapa.id] || 0;
     const isActive = activeEtapa === etapa.id;
 
@@ -2678,9 +2678,11 @@ function renderClientesBaseTableRows(clientes, { extended = false, expandedId = 
     if (extended) {
       return `
         <tr class="cliente-row${isOpen ? ' is-open' : ''}" data-cliente-row="${rowId}" tabindex="0" role="button" aria-expanded="${isOpen ? 'true' : 'false'}">
-          <td class="cliente-nome-cell">
-            <span class="cliente-row-chevron" aria-hidden="true">${isOpen ? '▾' : '▸'}</span>
-            <strong>${c.nome}</strong>${fotoBadge}${arqBadge}
+          <td>
+            <div class="cliente-nome-cell">
+              <span class="cliente-row-chevron" aria-hidden="true">${isOpen ? '▾' : '▸'}</span>
+              <strong>${c.nome}</strong>${fotoBadge}${arqBadge}
+            </div>
           </td>
           <td class="cliente-status-cell">
             <span class="status-badge ${st.class}">${st.label}</span>
