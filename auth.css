@@ -1073,13 +1073,19 @@ body.auth-page {
   border-radius: var(--radius);
   padding: 0.9rem 0.65rem 0.75rem;
   box-shadow: 0 4px 20px rgba(0, 18, 51, 0.1);
+  isolation: isolate;
 }
 
 .trilha-line {
+  display: none;
+}
+
+.trilha-step:not(:last-child)::after {
+  content: '';
   position: absolute;
-  top: calc(0.9rem + 14px);
-  left: 5%;
-  right: 5%;
+  top: calc(0.1rem + 14px);
+  left: calc(50% + 16px);
+  width: calc(100% + 0.15rem - 32px);
   height: 2px;
   background: linear-gradient(
     90deg,
@@ -1126,7 +1132,6 @@ body.auth-page {
   font-size: 0.65rem;
   font-weight: 700;
   flex-shrink: 0;
-  box-shadow: 0 0 0 2px #fff;
 }
 
 .trilha-step-label {
@@ -1147,7 +1152,7 @@ body.auth-page {
 }
 
 .trilha-step.has-clients .trilha-step-marker {
-  background: rgba(0, 151, 57, 0.12);
+  background: #e3f5ea;
   border-color: rgba(0, 151, 57, 0.45);
   color: var(--color-green-dark);
 }
@@ -3550,7 +3555,7 @@ body.modal-open {
     padding: 0.85rem 0.5rem 0.65rem;
   }
 
-  .trilha-line {
+  .trilha-step:not(:last-child)::after {
     display: none;
   }
 

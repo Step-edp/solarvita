@@ -2741,7 +2741,7 @@ function refreshClientesBaseUI() {
     `;
   }
   if (trilhaEl) {
-    trilhaEl.innerHTML = `<span class="trilha-line" aria-hidden="true"></span>${renderClientesTrilhaHtml(clientesBase, clientesFiltroEtapa)}`;
+    trilhaEl.innerHTML = renderClientesTrilhaHtml(clientesBase, clientesFiltroEtapa);
   }
 }
 
@@ -4466,9 +4466,7 @@ async function renderVendedorClientesPage(session) {
     <div id="clientes-resumo-stats" class="clientes-resumo-grid"></div>
 
     <div class="clientes-trilha-wrap">
-      <div id="clientes-trilha" class="clientes-trilha" role="list" aria-label="Trilha do cliente">
-        <span class="trilha-line" aria-hidden="true"></span>
-      </div>
+      <div id="clientes-trilha" class="clientes-trilha" role="list" aria-label="Trilha do cliente"></div>
     </div>
 
     <section class="vendedor-section clientes-base-section">
