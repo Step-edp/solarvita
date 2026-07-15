@@ -7,9 +7,9 @@ const ADMIN_EQUIPE_ATIVIDADES = (typeof SOLARVITA_DEMO !== 'undefined' && SOLARV
   : [];
 
 let adminSessionRef = null;
-let adminActiveTab = 'cadastros';
+let adminActiveTab = 'usuarios';
 let adminInitialTabSet = false;
-let adminUsuariosFilter = { search: '', tipo: '', status: '' };
+let adminUsuariosFilter = { search: '', tipo: '', status: '', perfil: '' };
 
 function getAtividadesAdiadasAtivas(colaborador) {
   return colaborador.atividades.filter((a) => !a.concluida && a.diasAdiada > 0);
@@ -95,6 +95,7 @@ function filterUsuarios(usuarios) {
   return usuarios.filter((user) => {
     if (adminUsuariosFilter.tipo && user.tipo !== adminUsuariosFilter.tipo) return false;
     if (adminUsuariosFilter.status && (user.status || 'aprovado') !== adminUsuariosFilter.status) return false;
+    if (adminUsuariosFilter.perfil && (user.perfil || '') !== adminUsuariosFilter.perfil) return false;
 
     if (!term) return true;
 
@@ -112,6 +113,14 @@ function filterUsuarios(usuarios) {
     if (digits && user.cpf.includes(digits)) return true;
     return false;
   });
+}
+
+function renderPerfilFilterOptions(selected = '') {
+  return Object.entries(ADMIN_PROFILES)
+    .map(([value, profile]) => (
+      `<option value="${value}" ${selected === value ? 'selected' : ''}>${profile.label}</option>`
+    ))
+    .join('');
 }
 
 function renderUsuariosRows(usuarios) {
@@ -255,6 +264,13 @@ function handleAdminPanelInput(event) {
   if (statusSelect) {
     adminUsuariosFilter.status = statusSelect.value;
     refreshUsuariosTable();
+    return;
+  }
+
+  const perfilSelect = event.target.closest('[data-usuarios-perfil]');
+  if (perfilSelect) {
+    adminUsuariosFilter.perfil = perfilSelect.value;
+    refreshUsuariosTable();
   }
 }
 
@@ -346,65 +362,28 @@ async function renderAdministradorDashboard(session) {
     adminActiveTab = pendentesList.length ? 'cadastros' : 'usuarios';
     adminInitialTabSet = true;
   }
-  if (adminActiveTab === 'cadastros' && !pendentesList.length) {
-    adminActiveTab = 'usuarios';
-  }
 
   adminPanel.innerHTML = `
     <div class="admin-header">
       <div>
         <h1>Painel do Administrador</h1>
-        <p>Olá, <strong>${getPrimeiroNome(session.nome)}</strong> — gerencie cadastros, usuários e acompanhe a equipe</p>
+        <p>Olá, <strong>${getPrimeiroNome(session.nome)}</strong> — visualize todos os usuários, aprove cadastros e acompanhe a equipe</p>
       </div>
       <a href="/" class="btn btn-outline-light">Voltar ao site</a>
     </div>
 
     <div class="admin-tabs">
-      <button type="button" class="admin-tab ${adminActiveTab === 'cadastros' ? 'active' : ''}" data-admin-tab="cadastros">
-        Cadastros pendentes
-        ${pendentesList.length ? `<span class="admin-tab-badge">${pendentesList.length}</span>` : ''}
-      </button>
       <button type="button" class="admin-tab ${adminActiveTab === 'usuarios' ? 'active' : ''}" data-admin-tab="usuarios">
         Usuários
         <span class="admin-tab-badge admin-tab-badge-muted">${usuariosResumo.total}</span>
       </button>
+      <button type="button" class="admin-tab ${adminActiveTab === 'cadastros' ? 'active' : ''}" data-admin-tab="cadastros">
+        Cadastros pendentes
+        ${pendentesList.length ? `<span class="admin-tab-badge">${pendentesList.length}</span>` : ''}
+      </button>
       <button type="button" class="admin-tab ${adminActiveTab === 'atividades' ? 'active' : ''}" data-admin-tab="atividades">
         Atividades adiadas
       </button>
-    </div>
-
-    <div class="admin-tab-panel" data-admin-panel="cadastros" ${adminActiveTab !== 'cadastros' ? 'hidden' : ''}>
-      <div class="admin-stats-grid admin-stats-grid-compact">
-        <div class="admin-stat-card admin-stat-card-alert">
-          <span class="admin-stat-label">Aguardando aprovação</span>
-          <span class="admin-stat-value">${pendentesList.length}</span>
-          <span class="admin-stat-extra">Solicitações de acesso</span>
-        </div>
-      </div>
-
-      <section class="vendedor-section admin-section">
-        <h2>Solicitações de cadastro</h2>
-        <p class="section-desc">Revise os dados e aprove ou rejeite novos acessos administrativos.</p>
-        ${pendentesError ? `<div class="auth-alert show error">${pendentesError}</div>` : ''}
-        <div class="admin-table-wrap">
-          <table class="admin-table admin-table-cadastros">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>CPF</th>
-                <th>E-mail</th>
-                <th>WhatsApp</th>
-                <th>Perfil</th>
-                <th>Solicitado em</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${renderCadastrosPendentesRows(pendentesList)}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
 
     <div class="admin-tab-panel" data-admin-panel="usuarios" ${adminActiveTab !== 'usuarios' ? 'hidden' : ''}>
@@ -412,7 +391,7 @@ async function renderAdministradorDashboard(session) {
         <div class="admin-stat-card">
           <span class="admin-stat-label">Total de usuários</span>
           <span class="admin-stat-value">${usuariosResumo.total}</span>
-          <span class="admin-stat-extra">Cadastrados no sistema</span>
+          <span class="admin-stat-extra">Todos os cadastros no sistema</span>
         </div>
         <div class="admin-stat-card">
           <span class="admin-stat-label">Administrativos</span>
@@ -429,11 +408,16 @@ async function renderAdministradorDashboard(session) {
           <span class="admin-stat-value">${usuariosResumo.parceiro}</span>
           <span class="admin-stat-extra">Rede de parceiros</span>
         </div>
+        <div class="admin-stat-card admin-stat-card-alert">
+          <span class="admin-stat-label">Pendentes</span>
+          <span class="admin-stat-value">${usuariosResumo.pendentes}</span>
+          <span class="admin-stat-extra">Aguardando aprovação</span>
+        </div>
       </div>
 
       <section class="vendedor-section admin-section">
-        <h2>Usuários cadastrados</h2>
-        <p class="section-desc">Visualize todos os usuários do sistema, com tipo, perfil e status de acesso.</p>
+        <h2>Todos os usuários</h2>
+        <p class="section-desc">Lista completa de usuários cadastrados, com tipo, perfil, contato e status de acesso.</p>
         ${usuariosError ? `<div class="auth-alert show error">${usuariosError}</div>` : ''}
 
         <div class="clientes-toolbar admin-usuarios-toolbar">
@@ -453,6 +437,10 @@ async function renderAdministradorDashboard(session) {
               <option value="admin" ${adminUsuariosFilter.tipo === 'admin' ? 'selected' : ''}>Administrativo</option>
               <option value="cliente" ${adminUsuariosFilter.tipo === 'cliente' ? 'selected' : ''}>Cliente</option>
               <option value="parceiro" ${adminUsuariosFilter.tipo === 'parceiro' ? 'selected' : ''}>Parceiro</option>
+            </select>
+            <select data-usuarios-perfil aria-label="Filtrar por perfil">
+              <option value="" ${adminUsuariosFilter.perfil === '' ? 'selected' : ''}>Todos os perfis</option>
+              ${renderPerfilFilterOptions(adminUsuariosFilter.perfil)}
             </select>
             <select data-usuarios-status aria-label="Filtrar por status">
               <option value="" ${adminUsuariosFilter.status === '' ? 'selected' : ''}>Todos os status</option>
@@ -484,6 +472,40 @@ async function renderAdministradorDashboard(session) {
             </thead>
             <tbody data-usuarios-tbody>
               ${renderUsuariosRows(usuariosFiltrados)}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="admin-tab-panel" data-admin-panel="cadastros" ${adminActiveTab !== 'cadastros' ? 'hidden' : ''}>
+      <div class="admin-stats-grid admin-stats-grid-compact">
+        <div class="admin-stat-card admin-stat-card-alert">
+          <span class="admin-stat-label">Aguardando aprovação</span>
+          <span class="admin-stat-value">${pendentesList.length}</span>
+          <span class="admin-stat-extra">Solicitações de acesso</span>
+        </div>
+      </div>
+
+      <section class="vendedor-section admin-section">
+        <h2>Solicitações de cadastro</h2>
+        <p class="section-desc">Revise os dados e aprove ou rejeite novos acessos administrativos.</p>
+        ${pendentesError ? `<div class="auth-alert show error">${pendentesError}</div>` : ''}
+        <div class="admin-table-wrap">
+          <table class="admin-table admin-table-cadastros">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>CPF</th>
+                <th>E-mail</th>
+                <th>WhatsApp</th>
+                <th>Perfil</th>
+                <th>Solicitado em</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${renderCadastrosPendentesRows(pendentesList)}
             </tbody>
           </table>
         </div>
