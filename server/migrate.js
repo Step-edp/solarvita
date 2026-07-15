@@ -1,5 +1,7 @@
 const { query } = require('./db');
 
+const LEGACY_ANEXOS_MIGRATION_ID = '20260715_clear_legacy_anexos';
+
 async function migrate() {
   await query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -76,6 +78,46 @@ async function migrate() {
   await query(`
     CREATE INDEX IF NOT EXISTS anexo_arquivos_cliente_idx ON anexo_arquivos(cliente_id)
   `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id TEXT PRIMARY KEY,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await cleanupLegacyAnexos();
 }
 
-module.exports = { migrate };
+async function cleanupLegacyAnexos() {
+  const applied = await query(
+    `SELECT 1 FROM schema_migrations WHERE id = $1`,
+    [LEGACY_ANEXOS_MIGRATION_ID]
+  );
+
+  if (applied.rows.length) return;
+
+  const clientes = await query(
+    `SELECT id FROM vendedor_clientes WHERE dados ? 'arquivos'`
+  );
+
+  for (const row of clientes.rows) {
+    await query(
+      `UPDATE vendedor_clientes
+       SET dados = dados - 'arquivos'
+       WHERE id = $1`,
+      [row.id]
+    );
+  }
+
+  await query(`DELETE FROM anexo_arquivos`);
+
+  await query(
+    `INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
+    [LEGACY_ANEXOS_MIGRATION_ID]
+  );
+
+  console.log(`Anexos removidos de ${clientes.rows.length} cliente(s).`);
+}
+
+module.exports = { migrate, cleanupLegacyAnexos };

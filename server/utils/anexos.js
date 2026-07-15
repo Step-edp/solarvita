@@ -95,6 +95,62 @@ async function linkAnexosToCliente(queryFn, clienteId, arquivos, cpf) {
   }
 }
 
+function pruneUnstoredAnexos(arquivos) {
+  if (!arquivos) return null;
+
+  const arq = normalizeArquivos(arquivos);
+  let hasStored = false;
+
+  if (Array.isArray(arq.contaLuz)) {
+    arq.contaLuz = arq.contaLuz.filter((entry) => {
+      if (entry?.url) {
+        hasStored = true;
+        return true;
+      }
+      return false;
+    });
+    if (!arq.contaLuz.length) delete arq.contaLuz;
+  }
+
+  if (arq.drone) {
+    const nextDrone = {};
+    Object.entries(arq.drone).forEach(([slotId, entry]) => {
+      if (entry?.url) {
+        hasStored = true;
+        nextDrone[slotId] = entry;
+      }
+    });
+    if (Object.keys(nextDrone).length) arq.drone = nextDrone;
+    else delete arq.drone;
+  }
+
+  if (Array.isArray(arq.extras)) {
+    arq.extras = arq.extras.filter((entry) => {
+      if (entry?.url) {
+        hasStored = true;
+        return true;
+      }
+      return false;
+    });
+    if (!arq.extras.length) delete arq.extras;
+  }
+
+  if (arq.video?.name) {
+    if (arq.video.url) hasStored = true;
+    else delete arq.video;
+  }
+
+  if (!hasStored) return null;
+
+  return arq;
+}
+
+function collectStoredAnexoIds(arquivos) {
+  return collectAnexoRefs(arquivos)
+    .map((ref) => extractAnexoId(ref.entry?.url))
+    .filter(Boolean);
+}
+
 module.exports = {
   normalizeArquivos,
   getAnexoAtPath,
@@ -102,5 +158,7 @@ module.exports = {
   extractAnexoId,
   collectAnexoRefs,
   validateArquivosHaveUrls,
-  linkAnexosToCliente
+  linkAnexosToCliente,
+  pruneUnstoredAnexos,
+  collectStoredAnexoIds
 };
