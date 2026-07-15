@@ -69,6 +69,13 @@ async function migrate() {
   await query(`
     CREATE INDEX IF NOT EXISTS anexo_arquivos_cpf_idx ON anexo_arquivos(vendedor_cpf)
   `);
+
+  await query(`ALTER TABLE anexo_arquivos ADD COLUMN IF NOT EXISTS cliente_id INTEGER REFERENCES vendedor_clientes(id) ON DELETE SET NULL`);
+  await query(`ALTER TABLE anexo_arquivos ADD COLUMN IF NOT EXISTS anexo_path TEXT`);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS anexo_arquivos_cliente_idx ON anexo_arquivos(cliente_id)
+  `);
 }
 
 module.exports = { migrate };

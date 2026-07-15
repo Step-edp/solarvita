@@ -1798,12 +1798,16 @@ async function buildFileInfo(file) {
 
   if (SOLARVITA_CONFIG.useDatabase) {
     const uploaded = await SolarVitaAPI.uploadAnexo(file);
+    if (!uploaded?.url) {
+      throw new Error(`Não foi possível armazenar "${file.name}". Tente novamente.`);
+    }
     return {
       ...info,
       name: uploaded.name || info.name,
       type: uploaded.type || info.type,
       size: uploaded.size ?? info.size,
-      url: uploaded.url
+      url: uploaded.url,
+      stored: true
     };
   }
 
@@ -1917,6 +1921,31 @@ function countMissingAnexoFiles(arquivos) {
   return count;
 }
 
+function assertArquivosArmazenados(arquivos) {
+  const refs = [];
+
+  const contas = Array.isArray(arquivos?.contaLuz)
+    ? arquivos.contaLuz
+    : (arquivos?.contaLuz ? [arquivos.contaLuz] : []);
+  contas.forEach((entry) => {
+    if (entry?.name && !entry?.url) refs.push(entry.name);
+  });
+
+  Object.values(arquivos?.drone || {}).forEach((entry) => {
+    if (entry?.name && !entry?.url) refs.push(entry.name);
+  });
+
+  (arquivos?.extras || []).forEach((entry) => {
+    if (entry?.name && !entry?.url) refs.push(entry.name);
+  });
+
+  if (arquivos?.video?.name && !arquivos.video?.url) refs.push(arquivos.video.name);
+
+  if (refs.length) {
+    throw new Error(`Estes anexos não foram armazenados: ${refs.join(', ')}`);
+  }
+}
+
 async function handleClienteAnexoUpload(input) {
   const clienteId = input.dataset.clienteId;
   const anexoPath = input.dataset.anexoPath;
@@ -1930,22 +1959,25 @@ async function handleClienteAnexoUpload(input) {
   if (uploadBtn) uploadBtn.classList.add('is-loading');
 
   try {
-    const uploaded = await buildFileInfo(file);
-    const current = getAnexoAtPath(cliente.arquivos, anexoPath) || {};
-    const arquivos = setAnexoAtPath(cliente.arquivos, anexoPath, {
-      ...current,
-      ...uploaded,
-      name: uploaded.name || current.name,
-      label: current.label,
-      nomeConta: current.nomeConta
-    });
-
     if (SOLARVITA_CONFIG.useDatabase) {
-      const data = await SolarVitaAPI.updateVendedorCliente(clienteId, { arquivos });
+      const data = await SolarVitaAPI.uploadClienteAnexo(clienteId, anexoPath, file);
+      const saved = getAnexoAtPath(data.cliente?.arquivos, anexoPath);
+      if (!saved?.url) {
+        throw new Error('Arquivo enviado, mas não foi salvo no cadastro do cliente.');
+      }
+
       const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(clienteId));
       if (idx >= 0) VENDEDOR_CLIENTES[idx] = data.cliente;
     } else {
-      cliente.arquivos = arquivos;
+      const uploaded = await buildFileInfo(file);
+      const current = getAnexoAtPath(cliente.arquivos, anexoPath) || {};
+      cliente.arquivos = setAnexoAtPath(cliente.arquivos, anexoPath, {
+        ...current,
+        ...uploaded,
+        name: uploaded.name || current.name,
+        label: current.label,
+        nomeConta: current.nomeConta
+      });
       saveVendedorClientes();
     }
 
@@ -2866,6 +2898,9 @@ function initRegistrarCliente() {
     let arquivos;
     try {
       arquivos = await collectArquivosAsync(form);
+      if (SOLARVITA_CONFIG.useDatabase) {
+        assertArquivosArmazenados(arquivos);
+      }
     } catch (err) {
       showModalAlert(form, err.message || 'Não foi possível enviar os anexos. Tente novamente.');
       submitBtn.disabled = false;

@@ -102,6 +102,42 @@ const SolarVitaAPI = {
       throw error;
     }
 
+    if (!data.url) {
+      throw new Error('Arquivo enviado, mas não foi armazenado no servidor.');
+    }
+
+    return data;
+  },
+
+  async uploadClienteAnexo(clienteId, anexoPath, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('anexoPath', anexoPath);
+
+    const response = await fetch(`/api/vendedor/clientes/${clienteId}/anexos`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData
+    });
+
+    let data = {};
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+
+    if (!response.ok) {
+      const error = new Error(data.message || data.error || 'Erro ao salvar anexo do cliente.');
+      error.code = data.error || 'upload_failed';
+      error.status = response.status;
+      throw error;
+    }
+
+    if (!data.stored || !data.anexo?.url) {
+      throw new Error('Arquivo enviado, mas não foi vinculado ao cliente.');
+    }
+
     return data;
   },
 
