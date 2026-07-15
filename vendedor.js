@@ -2685,12 +2685,12 @@ function renderClientesBaseTableRows(clientes, { extended = false, expandedId = 
           </td>
           <td class="cliente-status-cell">
             <span class="status-badge ${st.class}">${st.label}</span>
-            ${prospectadoAcoes}
           </td>
           <td>${formatDataRetorno(c.dataRetorno)}</td>
+          <td class="cliente-acoes-cell">${prospectadoAcoes || '—'}</td>
         </tr>
         <tr class="cliente-detalhe-row" data-cliente-detalhe="${rowId}" ${isOpen ? '' : 'hidden'}>
-          <td colspan="3">${renderClienteDetalheHtml(c)}</td>
+          <td colspan="4">${renderClienteDetalheHtml(c)}</td>
         </tr>
       `;
     }
@@ -4498,6 +4498,7 @@ async function renderVendedorClientesPage(session) {
               <th>Cliente</th>
               <th>Status</th>
               <th>Retorno</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody id="clientes-base-tbody"></tbody>

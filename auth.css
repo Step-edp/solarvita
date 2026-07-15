@@ -1227,6 +1227,17 @@ body.auth-page {
   font-size: 0.84rem;
 }
 
+.clientes-table-base th:last-child,
+.clientes-table-base .cliente-acoes-cell {
+  width: 12rem;
+  min-width: 12rem;
+}
+
+.clientes-table-base .cliente-status-cell {
+  width: 7.5rem;
+  min-width: 7.5rem;
+}
+
 .clientes-empty {
   text-align: center;
   padding: 2rem 1rem !important;
