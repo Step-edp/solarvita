@@ -1466,7 +1466,12 @@ body.auth-page {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  margin-top: 0.45rem;
+}
+
+.cliente-acoes-cell {
+  vertical-align: middle;
+  white-space: nowrap;
+  min-width: 11rem;
 }
 
 .btn-prospectado-acao {

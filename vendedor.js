@@ -2652,7 +2652,7 @@ async function handleProspectadoAcao(clienteId, acao) {
 
 function renderClientesBaseTableRows(clientes, { extended = false, expandedId = '' } = {}) {
   if (!clientes.length) {
-    const cols = extended ? 3 : 5;
+    const cols = extended ? 4 : 5;
     return `<tr><td colspan="${cols}" class="clientes-empty">Nenhum cliente encontrado.</td></tr>`;
   }
 
