@@ -4457,7 +4457,6 @@ async function renderVendedorClientesPage(session) {
       <div>
         <a href="/painel/admin" class="clientes-back-link">← Voltar ao painel</a>
         <h1>Minha base de clientes</h1>
-        <p>Olá, <strong>${getPrimeiroNome(session.nome)}</strong> — consulte e filtre todos os seus clientes cadastrados</p>
       </div>
       <a href="/painel/admin" class="btn btn-primary" id="btn-registrar-cliente">+ Registrar cliente</a>
     </div>
