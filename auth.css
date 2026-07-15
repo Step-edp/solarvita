@@ -1123,15 +1123,16 @@ body.auth-page {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: #eef2f8;
   border: 2px solid rgba(0, 27, 77, 0.12);
   color: rgba(0, 27, 77, 0.55);
-  font-size: 0.65rem;
+  font-size: clamp(0.62rem, 0.85vw, 0.72rem);
   font-weight: 700;
   flex-shrink: 0;
+  line-height: 1;
 }
 
 .trilha-step-label {
@@ -1142,13 +1143,6 @@ body.auth-page {
   color: rgba(0, 27, 77, 0.65);
   width: 100%;
   overflow-wrap: anywhere;
-}
-
-.trilha-step-count {
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: var(--color-green-dark);
-  line-height: 1;
 }
 
 .trilha-step.has-clients .trilha-step-marker {

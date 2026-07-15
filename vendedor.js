@@ -2313,9 +2313,8 @@ function renderClientesTrilhaHtml(list, activeEtapa = '') {
         title="${etapa.label}: ${count} cliente${count === 1 ? '' : 's'}"
         aria-pressed="${isActive ? 'true' : 'false'}"
       >
-        <span class="trilha-step-marker">${index + 1}</span>
+        <span class="trilha-step-marker">${count}</span>
         <span class="trilha-step-label">${etapa.label}</span>
-        <span class="trilha-step-count">${count}</span>
       </button>
     `;
   }).join('');
