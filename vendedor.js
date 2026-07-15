@@ -2582,8 +2582,11 @@ function renderClienteDetalheHtml(cliente) {
   return `
     <div class="cliente-detalhe-wrap">
       <div class="cliente-detalhe-actions">
-        <button type="button" class="btn btn-outline-light btn-sm btn-editar-cliente" data-edit-cliente="${escapeHtml(String(cliente.id))}">
-          Editar informações
+        <button type="button" class="btn-editar-cliente" data-edit-cliente="${escapeHtml(String(cliente.id))}" aria-label="Editar informações do cliente" title="Editar informações">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+          </svg>
         </button>
       </div>
       ${renderDetalheSection('Dados gerais', geral)}
