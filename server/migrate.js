@@ -53,6 +53,22 @@ async function migrate() {
   await query(`
     CREATE INDEX IF NOT EXISTS vendedor_clientes_cpf_idx ON vendedor_clientes(vendedor_cpf)
   `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS anexo_arquivos (
+      id SERIAL PRIMARY KEY,
+      vendedor_cpf CHAR(11) NOT NULL,
+      nome TEXT NOT NULL,
+      mime TEXT,
+      tamanho INTEGER,
+      dados BYTEA NOT NULL,
+      criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS anexo_arquivos_cpf_idx ON anexo_arquivos(vendedor_cpf)
+  `);
 }
 
 module.exports = { migrate };

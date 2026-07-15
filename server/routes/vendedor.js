@@ -2,11 +2,72 @@ const express = require('express');
 const { query } = require('../db');
 const { onlyDigits } = require('../utils/users');
 const { attachSession, requireVendedor } = require('../middleware/session');
+const { upload } = require('../uploads');
 
 const router = express.Router();
 
 router.use(attachSession);
 router.use(requireVendedor);
+
+router.post('/anexos', upload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Arquivo não enviado.' });
+    }
+
+    const cpf = onlyDigits(req.user.cpf);
+    const inserted = await query(
+      `INSERT INTO anexo_arquivos (vendedor_cpf, nome, mime, tamanho, dados)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, nome, mime, tamanho`,
+      [cpf, req.file.originalname, req.file.mimetype, req.file.size, req.file.buffer]
+    );
+
+    const row = inserted.rows[0];
+    res.status(201).json({
+      name: row.nome,
+      type: row.mime,
+      size: row.tamanho,
+      url: `/api/vendedor/anexos/${row.id}`
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/anexos/:id', async (req, res, next) => {
+  try {
+    const cpf = onlyDigits(req.user.cpf);
+    const id = Number.parseInt(req.params.id, 10);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Anexo inválido.' });
+    }
+
+    const result = await query(
+      `SELECT nome, mime, tamanho, dados, vendedor_cpf
+       FROM anexo_arquivos
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: 'Anexo não encontrado.' });
+    }
+
+    const row = result.rows[0];
+    if (row.vendedor_cpf !== cpf) {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
+    res.setHeader('Content-Type', row.mime || 'application/octet-stream');
+    res.setHeader('Content-Length', row.tamanho || row.dados.length);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(row.nome || 'anexo')}"`);
+    res.send(row.dados);
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get('/clientes', async (req, res, next) => {
   try {

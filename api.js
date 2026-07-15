@@ -78,6 +78,33 @@ const SolarVitaAPI = {
     });
   },
 
+  async uploadAnexo(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/vendedor/anexos', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData
+    });
+
+    let data = {};
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+
+    if (!response.ok) {
+      const error = new Error(data.message || data.error || 'Erro ao enviar anexo.');
+      error.code = data.error || 'upload_failed';
+      error.status = response.status;
+      throw error;
+    }
+
+    return data;
+  },
+
   deleteVendedorCliente(id) {
     return this.request(`/vendedor/clientes/${id}`, {
       method: 'DELETE'

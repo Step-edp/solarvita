@@ -24,7 +24,7 @@ const ROLES = ['parceiro', 'cliente', 'admin'];
 function createApp() {
   const app = express();
 
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ limit: '10mb' }));
   app.use(cookieParser(process.env.SESSION_SECRET || 'solarvita-dev-secret'));
 
   app.get('/api/health', (req, res) => {

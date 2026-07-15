@@ -717,21 +717,6 @@ function initContasLuz(form) {
   });
 }
 
-function collectContasLuz(form) {
-  const contas = [];
-  form.querySelectorAll('.conta-luz-item').forEach((item) => {
-    const nomeConta = item.querySelector('.conta-luz-nome')?.value.trim();
-    const fileInfo = getFileInfo(item.querySelector('.upload-input'));
-    if (nomeConta || fileInfo) {
-      contas.push({
-        nomeConta: nomeConta || '',
-        ...(fileInfo || {})
-      });
-    }
-  });
-  return contas;
-}
-
 function validateContasLuz(form) {
   for (const item of form.querySelectorAll('.conta-luz-item')) {
     const nomeConta = item.querySelector('.conta-luz-nome')?.value.trim();
@@ -1774,27 +1759,129 @@ function getFileInfo(input) {
   return { name: f.name, type: f.type, size: f.size };
 }
 
-function collectArquivos(form) {
-  const drone = {};
-  DRONE_SLOTS.forEach((s) => {
-    const info = getFileInfo(form.querySelector(`#drone-${s.id}`));
-    if (info) drone[s.id] = { ...info, label: s.label };
+function createImagePreview(file, maxWidth = 320, quality = 0.72) {
+  return new Promise((resolve) => {
+    if (!file?.type?.startsWith('image/')) {
+      resolve(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      img.src = reader.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
   });
+}
+
+async function buildFileInfo(file) {
+  if (!file) return null;
+
+  const info = {
+    name: file.name,
+    type: file.type || guessMimeFromName(file.name),
+    size: file.size
+  };
+
+  if (SOLARVITA_CONFIG.useDatabase) {
+    const uploaded = await SolarVitaAPI.uploadAnexo(file);
+    return {
+      ...info,
+      name: uploaded.name || info.name,
+      type: uploaded.type || info.type,
+      size: uploaded.size ?? info.size,
+      url: uploaded.url
+    };
+  }
+
+  if (isImageFile(info)) {
+    info.preview = await createImagePreview(file);
+  }
+
+  return info;
+}
+
+function guessMimeFromName(name = '') {
+  const lower = name.toLowerCase();
+  if (/\.jpe?g$/.test(lower)) return 'image/jpeg';
+  if (/\.png$/.test(lower)) return 'image/png';
+  if (/\.webp$/.test(lower)) return 'image/webp';
+  if (/\.gif$/.test(lower)) return 'image/gif';
+  if (/\.pdf$/.test(lower)) return 'application/pdf';
+  if (/\.mp4$/.test(lower)) return 'video/mp4';
+  return '';
+}
+
+function isImageFile(file) {
+  const type = file?.type || '';
+  if (type.startsWith('image/')) return true;
+  return /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file?.name || '');
+}
+
+function getAnexoImageSrc(file) {
+  return file?.url || file?.preview || null;
+}
+
+async function collectContasLuzAsync(form) {
+  const contas = [];
+  for (const item of form.querySelectorAll('.conta-luz-item')) {
+    const nomeConta = item.querySelector('.conta-luz-nome')?.value.trim();
+    const file = item.querySelector('.upload-input')?.files?.[0];
+    if (nomeConta || file) {
+      const fileInfo = file ? await buildFileInfo(file) : {};
+      contas.push({
+        nomeConta: nomeConta || '',
+        ...fileInfo
+      });
+    }
+  }
+  return contas;
+}
+
+async function collectArquivosAsync(form) {
+  const drone = {};
+  for (const s of DRONE_SLOTS) {
+    const file = form.querySelector(`#drone-${s.id}`)?.files?.[0];
+    if (file) {
+      const info = await buildFileInfo(file);
+      drone[s.id] = { ...info, label: s.label };
+    }
+  }
+
   const extrasInput = form.querySelector('#file-extras');
   const extrasZone = extrasInput?.closest('.upload-zone');
   const extrasFiles = extrasZone?._files?.length
     ? extrasZone._files
     : Array.from(extrasInput?.files || []);
-  const extras = extrasFiles.map(f => ({
-    name: f.name,
-    type: f.type,
-    size: f.size
-  }));
+  const extras = [];
+  for (const file of extrasFiles) {
+    const info = await buildFileInfo(file);
+    if (info) extras.push(info);
+  }
+
+  const videoFile = form.querySelector('#file-video')?.files?.[0];
+  const video = videoFile
+    ? { name: videoFile.name, type: videoFile.type, size: videoFile.size }
+    : null;
+
   return {
-    contaLuz: collectContasLuz(form),
+    contaLuz: await collectContasLuzAsync(form),
     drone,
     extras,
-    video: getFileInfo(form.querySelector('#file-video'))
+    video
   };
 }
 
@@ -2121,9 +2208,25 @@ function getFileIcon(type = '') {
 
 function renderAnexoItem(file, label = '') {
   if (!file?.name) return '';
+  const isImage = isImageFile(file);
+  const imageSrc = isImage ? getAnexoImageSrc(file) : null;
+  let previewHtml;
+
+  if (imageSrc) {
+    previewHtml = `<a class="cliente-anexo-thumb" href="${imageSrc}" target="_blank" rel="noopener noreferrer" title="Abrir ${escapeHtml(file.name)}">
+        <img src="${imageSrc}" alt="${escapeHtml(file.name)}" loading="lazy">
+      </a>`;
+  } else if (isImage) {
+    previewHtml = `<div class="cliente-anexo-thumb cliente-anexo-thumb-missing" title="Foto não disponível — cadastre o cliente novamente para exibir a imagem">
+        <span class="cliente-anexo-missing-label">Foto indisponível</span>
+      </div>`;
+  } else {
+    previewHtml = `<span class="cliente-anexo-icon" aria-hidden="true">${getFileIcon(file.type || '')}</span>`;
+  }
+
   return `
-    <li class="cliente-anexo-item">
-      <span class="cliente-anexo-icon" aria-hidden="true">${getFileIcon(file.type || '')}</span>
+    <li class="cliente-anexo-item${imageSrc || isImage ? ' has-preview' : ''}">
+      ${previewHtml}
       <div class="cliente-anexo-info">
         ${label ? `<span class="cliente-anexo-label">${escapeHtml(label)}</span>` : ''}
         <span class="cliente-anexo-name">${escapeHtml(file.name)}</span>
@@ -2587,9 +2690,19 @@ function initRegistrarCliente() {
       return;
     }
 
-    const arquivos = collectArquivos(form);
-
     submitBtn.disabled = true;
+    submitBtn.textContent = 'Enviando anexos...';
+
+    let arquivos;
+    try {
+      arquivos = await collectArquivosAsync(form);
+    } catch (err) {
+      showModalAlert(form, err.message || 'Não foi possível enviar os anexos. Tente novamente.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Salvar cliente';
+      return;
+    }
+
     submitBtn.textContent = 'Capturando localização...';
 
     let loc;

@@ -1462,6 +1462,50 @@ body.auth-page {
   border-radius: var(--radius-sm);
 }
 
+.cliente-anexo-item.has-preview {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.cliente-anexo-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #eef2f8;
+  overflow: hidden;
+}
+
+.cliente-anexo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cliente-anexo-thumb-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eef2f8 0%, #e2e8f0 100%);
+}
+
+.cliente-anexo-missing-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 27, 77, 0.4);
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.cliente-anexo-item.has-preview .cliente-anexo-info {
+  padding: 0.65rem 0.75rem;
+}
+
 .cliente-anexo-icon {
   font-size: 1.25rem;
   line-height: 1;
