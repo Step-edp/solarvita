@@ -1963,10 +1963,12 @@ function refreshVendedorStatsUI() {
   if (comissaoDetalhe) comissaoDetalhe.textContent = `${VENDEDOR_STATS.convertidas} vendas convertidas`;
 }
 
-function filterClientesBase(list, { busca = '', status = '' } = {}) {
+function filterClientesBase(list, { busca = '', status = '', etapa = '' } = {}) {
   const termo = busca.trim().toLowerCase();
+
   return list.filter((c) => {
     if (status && c.status !== status) return false;
+    if (etapa && getClienteEtapaTrilha(c) !== etapa) return false;
     if (!termo) return true;
     const haystack = [
       c.nome,
@@ -1992,6 +1994,66 @@ function getClientesBaseResumo(list) {
     if (resumo[c.status] != null) resumo[c.status] += 1;
   });
   return resumo;
+}
+
+const CLIENTE_TRILHA_ETAPAS = [
+  { id: 'prospecao', label: 'Prospecção' },
+  { id: 'drone', label: 'Drone' },
+  { id: 'proposta', label: 'Proposta' },
+  { id: 'apresentacao', label: 'Apresentação' },
+  { id: 'follow-up', label: 'Follow Up' },
+  { id: 'contrato', label: 'Contrato' },
+  { id: 'pagamento', label: 'Pagamento' },
+  { id: 'procuracao', label: 'Procuração' },
+  { id: 'projeto', label: 'Projeto' },
+  { id: 'homologacao', label: 'Homologação' },
+  { id: 'instalacao', label: 'Instalação' },
+  { id: 'acompanhamento', label: 'Acompanhamento' }
+];
+
+let clientesFiltroEtapa = '';
+
+function getClienteEtapaTrilha(cliente) {
+  if (cliente?.etapaTrilha) return cliente.etapaTrilha;
+  if (cliente?.status === 'apresentado') return 'apresentacao';
+  if (cliente?.status === 'convertido') return 'acompanhamento';
+  return 'prospecao';
+}
+
+function getTrilhaResumo(list) {
+  const resumo = Object.fromEntries(CLIENTE_TRILHA_ETAPAS.map((etapa) => [etapa.id, 0]));
+  list.forEach((cliente) => {
+    const etapa = getClienteEtapaTrilha(cliente);
+    if (resumo[etapa] != null) resumo[etapa] += 1;
+  });
+  return resumo;
+}
+
+function renderClientesTrilhaHtml(list, activeEtapa = '') {
+  const resumo = getTrilhaResumo(list);
+
+  return CLIENTE_TRILHA_ETAPAS.map((etapa, index) => {
+    const count = resumo[etapa.id] || 0;
+    const isActive = activeEtapa === etapa.id;
+    const connector = index < CLIENTE_TRILHA_ETAPAS.length - 1
+      ? '<span class="trilha-connector" aria-hidden="true"></span>'
+      : '';
+
+    return `
+      <button
+        type="button"
+        class="trilha-step${count ? ' has-clients' : ''}${isActive ? ' is-active' : ''}"
+        data-etapa-trilha="${etapa.id}"
+        title="${etapa.label}: ${count} cliente${count === 1 ? '' : 's'}"
+        aria-pressed="${isActive ? 'true' : 'false'}"
+      >
+        <span class="trilha-step-marker">${index + 1}</span>
+        <span class="trilha-step-label">${etapa.label}</span>
+        <span class="trilha-step-count">${count}</span>
+      </button>
+      ${connector}
+    `;
+  }).join('');
 }
 
 function renderClientesBaseTableRows(clientes, { extended = false } = {}) {
@@ -2045,10 +2107,11 @@ function refreshClientesBaseUI() {
   const busca = document.getElementById('clientes-busca')?.value || '';
   const status = document.getElementById('clientes-filtro-status')?.value || '';
   const clientesBase = getClientesCadastrados();
-  const filtrados = filterClientesBase(clientesBase, { busca, status });
+  const filtrados = filterClientesBase(clientesBase, { busca, status, etapa: clientesFiltroEtapa });
   const tbody = document.getElementById('clientes-base-tbody');
   const countEl = document.getElementById('clientes-count');
   const resumoEl = document.getElementById('clientes-resumo-stats');
+  const trilhaEl = document.getElementById('clientes-trilha');
 
   if (tbody) tbody.innerHTML = renderClientesBaseTableRows(filtrados, { extended: true });
   if (countEl) {
@@ -2066,6 +2129,23 @@ function refreshClientesBaseUI() {
       <div class="clientes-resumo-item clientes-resumo-perdido"><span class="clientes-resumo-num">${resumo.perdido}</span><span>Perdidos</span></div>
     `;
   }
+  if (trilhaEl) {
+    trilhaEl.innerHTML = renderClientesTrilhaHtml(clientesBase, clientesFiltroEtapa);
+  }
+}
+
+function initClientesTrilhaHandlers(root = document) {
+  if (root.dataset.trilhaBound === 'true') return;
+  root.dataset.trilhaBound = 'true';
+
+  root.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-etapa-trilha]');
+    if (!btn || !root.contains(btn)) return;
+
+    const etapa = btn.dataset.etapaTrilha;
+    clientesFiltroEtapa = clientesFiltroEtapa === etapa ? '' : etapa;
+    refreshClientesBaseUI();
+  });
 }
 
 function renderVisitasListItems() {
@@ -2295,6 +2375,7 @@ function initRegistrarCliente() {
       definicaoPerfil: collectDefinicaoPerfil(form),
       arquivos,
       status: 'prospectado',
+      etapaTrilha: 'prospecao',
       data: formatDataHoje(),
       carimbo,
       lat: loc.lat,
@@ -3389,6 +3470,7 @@ function initVendedorMap() {
 
 async function renderVendedorClientesPage(session) {
   await syncVendedorClientesFromApi();
+  clientesFiltroEtapa = '';
 
   const panel = document.getElementById('panel-clientes');
   if (!panel) return;
@@ -3406,6 +3488,10 @@ async function renderVendedorClientesPage(session) {
     </div>
 
     <div id="clientes-resumo-stats" class="clientes-resumo-grid"></div>
+
+    <div class="clientes-trilha-wrap">
+      <div id="clientes-trilha" class="clientes-trilha" role="list" aria-label="Trilha do cliente"></div>
+    </div>
 
     <section class="vendedor-section clientes-base-section">
       <div class="clientes-toolbar">
@@ -3447,6 +3533,7 @@ async function renderVendedorClientesPage(session) {
   `;
 
   refreshClientesBaseUI();
+  initClientesTrilhaHandlers(panel);
 
   document.getElementById('clientes-busca')?.addEventListener('input', refreshClientesBaseUI);
   document.getElementById('clientes-filtro-status')?.addEventListener('change', refreshClientesBaseUI);
