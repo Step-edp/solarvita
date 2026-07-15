@@ -1816,18 +1816,6 @@ function isPapCliente(cliente) {
   return cliente?.tipoRegistro === 'pap';
 }
 
-function removerVisitasPap(clienteId, cliente) {
-  VENDEDOR_VISITAS = VENDEDOR_VISITAS.filter((visita) => {
-    if (visita.clienteId != null && String(visita.clienteId) === String(clienteId)) {
-      return false;
-    }
-    if (isPapCliente(cliente) && visita.tipoRegistro === 'pap') {
-      return !(visita.cliente === cliente.nome && visita.endereco === cliente.endereco);
-    }
-    return true;
-  });
-}
-
 function rebuildVendedorMapMarkers() {
   if (!vendedorMap || typeof L === 'undefined') return;
 
@@ -1868,11 +1856,7 @@ async function excluirPapCliente(id, triggerBtn) {
 
     VENDEDOR_CLIENTES = VENDEDOR_CLIENTES.filter((item) => String(item.id) !== String(id));
     saveVendedorClientes();
-    removerVisitasPap(id, cliente);
-
-    if (cliente.status === 'prospectado' && VENDEDOR_STATS.prospectados > 0) {
-      VENDEDOR_STATS.prospectados -= 1;
-    }
+    syncVisitasFromClientes();
 
     refreshClientesUI();
     refreshClientesBaseUI();
@@ -1924,6 +1908,59 @@ function formatWhatsAppCliente(value) {
 
 function getClientesCadastrados() {
   return VENDEDOR_CLIENTES.filter((cliente) => !isPapCliente(cliente));
+}
+
+function recalcularVendedorStats() {
+  const clientes = getClientesCadastrados();
+  VENDEDOR_STATS.apresentadas = 0;
+  VENDEDOR_STATS.convertidas = 0;
+  VENDEDOR_STATS.perdidas = 0;
+  VENDEDOR_STATS.prospectados = 0;
+
+  clientes.forEach((cliente) => {
+    if (cliente.status === 'apresentado') VENDEDOR_STATS.apresentadas += 1;
+    else if (cliente.status === 'convertido') VENDEDOR_STATS.convertidas += 1;
+    else if (cliente.status === 'perdido') VENDEDOR_STATS.perdidas += 1;
+    else if (cliente.status === 'prospectado') VENDEDOR_STATS.prospectados += 1;
+  });
+}
+
+function syncVisitasFromClientes() {
+  VENDEDOR_VISITAS = VENDEDOR_CLIENTES
+    .filter((cliente) => cliente.lat != null && cliente.lng != null)
+    .map((cliente) => ({
+      cliente: cliente.nome,
+      clienteId: cliente.id,
+      tipoRegistro: cliente.tipoRegistro,
+      endereco: cliente.endereco,
+      lat: Number(cliente.lat),
+      lng: Number(cliente.lng),
+      data: cliente.data || formatDataHoje(),
+      carimbo: cliente.carimbo,
+      observacao: cliente.observacao || ''
+    }));
+}
+
+function refreshVendedorStatsUI() {
+  recalcularVendedorStats();
+
+  const taxaConversao = VENDEDOR_STATS.apresentadas
+    ? Math.round((VENDEDOR_STATS.convertidas / VENDEDOR_STATS.apresentadas) * 100)
+    : 0;
+
+  const statApresentadas = document.querySelector('.stat-apresentadas .stat-value');
+  const statConvertidas = document.querySelector('.stat-convertidas .stat-value');
+  const statConvertidasExtra = document.querySelector('.stat-convertidas .stat-extra');
+  const statPerdidas = document.querySelector('.stat-perdidas .stat-value');
+  const statProspectados = document.getElementById('stat-prospectados');
+  const comissaoDetalhe = document.querySelector('.comissao-detalhe');
+
+  if (statApresentadas) statApresentadas.textContent = VENDEDOR_STATS.apresentadas;
+  if (statConvertidas) statConvertidas.textContent = VENDEDOR_STATS.convertidas;
+  if (statConvertidasExtra) statConvertidasExtra.textContent = `${taxaConversao}% de conversão`;
+  if (statPerdidas) statPerdidas.textContent = VENDEDOR_STATS.perdidas;
+  if (statProspectados) statProspectados.textContent = VENDEDOR_STATS.prospectados;
+  if (comissaoDetalhe) comissaoDetalhe.textContent = `${VENDEDOR_STATS.convertidas} vendas convertidas`;
 }
 
 function filterClientesBase(list, { busca = '', status = '' } = {}) {
@@ -2067,9 +2104,8 @@ function addMarkerToMap(visita) {
 
 function refreshClientesUI() {
   const tbody = document.getElementById('clientes-tbody');
-  const statProspectados = document.getElementById('stat-prospectados');
   if (tbody) tbody.innerHTML = renderClientesTableRows();
-  if (statProspectados) statProspectados.textContent = VENDEDOR_STATS.prospectados;
+  refreshVendedorStatsUI();
   refreshVisitasUI();
 }
 
@@ -2281,20 +2317,9 @@ function initRegistrarCliente() {
       saveVendedorClientes();
     }
 
-    const visita = {
-      cliente: nome,
-      endereco,
-      lat: loc.lat,
-      lng: loc.lng,
-      data: formatDataHoje(),
-      carimbo,
-      observacao: observacao || ''
-    };
-    VENDEDOR_VISITAS.unshift(visita);
-
-    VENDEDOR_STATS.prospectados += 1;
+    syncVisitasFromClientes();
     refreshClientesUI();
-    addMarkerToMap(visita);
+    rebuildVendedorMapMarkers();
     fecharModal();
   });
 }
@@ -2320,7 +2345,11 @@ function saveVendedorClientes() {
 let VENDEDOR_CLIENTES = loadVendedorClientes() || [...VENDEDOR_CLIENTES_SEED];
 
 async function syncVendedorClientesFromApi() {
-  if (!SOLARVITA_CONFIG.useDatabase) return;
+  if (!SOLARVITA_CONFIG.useDatabase) {
+    recalcularVendedorStats();
+    syncVisitasFromClientes();
+    return;
+  }
   try {
     const data = await SolarVitaAPI.getVendedorClientes();
     VENDEDOR_CLIENTES = data.clientes || [];
@@ -2328,6 +2357,8 @@ async function syncVendedorClientesFromApi() {
     console.error(error);
     VENDEDOR_CLIENTES = [];
   }
+  recalcularVendedorStats();
+  syncVisitasFromClientes();
 }
 
 let VENDEDOR_VISITAS = DEMO?.visitas ? [...DEMO.visitas] : [];
@@ -2990,22 +3021,9 @@ function initRegistrarPap() {
       saveVendedorClientes();
     }
 
-    const visita = {
-      cliente: registro.nome,
-      clienteId: registro.id,
-      tipoRegistro: 'pap',
-      endereco,
-      lat: registro.lat,
-      lng: registro.lng,
-      data: formatDataHoje(),
-      carimbo,
-      observacao
-    };
-    VENDEDOR_VISITAS.unshift(visita);
-
-    VENDEDOR_STATS.prospectados += 1;
+    syncVisitasFromClientes();
     refreshClientesUI();
-    addMarkerToMap(visita);
+    rebuildVendedorMapMarkers();
     fecharModalPap();
   });
 }
@@ -3230,6 +3248,8 @@ async function renderVendedorDashboard(session) {
 
   vendedorPanel.hidden = false;
   document.title = 'Painel do Vendedor — SolarVita';
+
+  recalcularVendedorStats();
 
   const taxaConversao = VENDEDOR_STATS.apresentadas
     ? Math.round((VENDEDOR_STATS.convertidas / VENDEDOR_STATS.apresentadas) * 100)
