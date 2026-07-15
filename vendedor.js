@@ -2061,49 +2061,218 @@ function getEtapaTrilhaLabel(etapaId) {
   return CLIENTE_TRILHA_ETAPAS.find((etapa) => etapa.id === etapaId)?.label || '—';
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatDetalheValue(value) {
+  if (value == null || value === '') return '';
+  if (Array.isArray(value)) {
+    const items = value.map((item) => {
+      if (item == null || item === '') return '';
+      if (typeof item === 'object') {
+        return Object.values(item).filter(Boolean).join(' · ');
+      }
+      return String(item);
+    }).filter(Boolean);
+    return items.length ? items.join(', ') : '';
+  }
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
+  return String(value);
+}
+
+function renderDetalheField(label, value, options = {}) {
+  const formatted = formatDetalheValue(value);
+  if (!formatted) return '';
+  const classes = [
+    'cliente-detalhe-item',
+    options.wide ? 'cliente-detalhe-item-wide' : '',
+    options.full ? 'cliente-detalhe-item-full' : ''
+  ].filter(Boolean).join(' ');
+
+  return `
+    <div class="${classes}">
+      <span class="cliente-detalhe-label">${escapeHtml(label)}</span>
+      <span class="cliente-detalhe-value">${escapeHtml(formatted)}</span>
+    </div>
+  `;
+}
+
+function renderDetalheSection(title, fieldsHtml) {
+  if (!fieldsHtml) return '';
+  return `
+    <section class="cliente-detalhe-section">
+      <h4 class="cliente-detalhe-section-title">${escapeHtml(title)}</h4>
+      <div class="cliente-detalhe-grid">${fieldsHtml}</div>
+    </section>
+  `;
+}
+
+function getFileIcon(type = '') {
+  if (type.startsWith('image/')) return '🖼️';
+  if (type === 'application/pdf') return '📄';
+  if (type.startsWith('video/')) return '🎬';
+  return '📎';
+}
+
+function renderAnexoItem(file, label = '') {
+  if (!file?.name) return '';
+  return `
+    <li class="cliente-anexo-item">
+      <span class="cliente-anexo-icon" aria-hidden="true">${getFileIcon(file.type || '')}</span>
+      <div class="cliente-anexo-info">
+        ${label ? `<span class="cliente-anexo-label">${escapeHtml(label)}</span>` : ''}
+        <span class="cliente-anexo-name">${escapeHtml(file.name)}</span>
+        <span class="cliente-anexo-meta">${formatFileSize(file.size || 0)}${file.type ? ` · ${escapeHtml(file.type)}` : ''}</span>
+      </div>
+    </li>
+  `;
+}
+
+function renderClienteAnexosHtml(arquivos) {
+  if (!arquivos) {
+    return '<p class="cliente-detalhe-empty">Nenhum anexo.</p>';
+  }
+
+  const items = [];
+  const contas = Array.isArray(arquivos.contaLuz)
+    ? arquivos.contaLuz
+    : (arquivos.contaLuz ? [arquivos.contaLuz] : []);
+
+  contas.forEach((conta) => {
+    if (!conta?.name) return;
+    const label = conta.nomeConta ? `Conta de luz — ${conta.nomeConta}` : 'Conta de luz';
+    items.push(renderAnexoItem(conta, label));
+  });
+
+  Object.values(arquivos.drone || {}).forEach((drone) => {
+    if (!drone?.name) return;
+    items.push(renderAnexoItem(drone, `Drone — ${drone.label || 'Foto'}`));
+  });
+
+  (arquivos.extras || []).forEach((extra) => {
+    if (!extra?.name) return;
+    items.push(renderAnexoItem(extra, 'Demais fotos'));
+  });
+
+  if (arquivos.video?.name) {
+    items.push(renderAnexoItem(arquivos.video, 'Vídeo'));
+  }
+
+  if (!items.length) {
+    return '<p class="cliente-detalhe-empty">Nenhum anexo.</p>';
+  }
+
+  return `<ul class="cliente-anexos-list">${items.join('')}</ul>`;
+}
+
+function renderClienteDadosConsumoHtml(dados) {
+  if (!dados) return '';
+
+  const fields = [
+    renderDetalheField('Consumos registrados', dados.consumos?.map((item) => {
+      if (!item.titulo && !item.valor) return '';
+      return `${item.titulo || 'Consumo'}: ${item.valor || '—'}`;
+    })),
+    renderDetalheField('Pretende aumentar consumo', dados.pretendeAumentarConsumo),
+    renderDetalheField('Modo de aumento', dados.aumentoConsumo?.modo),
+    renderDetalheField('Aumento em kW', dados.aumentoConsumo?.kw),
+    renderDetalheField('Equipamentos previstos', dados.aumentoConsumo?.equipamentos?.map((item) => {
+      if (!item.nome && !item.quantidade) return '';
+      return `${item.nome || 'Equipamento'} (${item.quantidade ?? '—'})`;
+    })),
+    renderDetalheField('Gênero do cliente', dados.clienteGenero),
+    renderDetalheField('Idade do cliente', dados.clienteIdade),
+    renderDetalheField('Pessoas no imóvel', dados.qtdPessoasNaoIdentificado ? 'Não identificado' : dados.qtdPessoasImovel),
+    renderDetalheField('Moradores', dados.ocupantes?.map((item) => {
+      const partes = [item.parentescoLabel || item.parentesco, item.sexo, item.idade != null ? `${item.idade} anos` : ''].filter(Boolean);
+      return partes.join(' · ');
+    })),
+    renderDetalheField('Tipo de imóvel', dados.tipoImovel),
+    renderDetalheField('Local do imóvel', dados.localImovel),
+    renderDetalheField('Posse do imóvel', dados.posseImovel),
+    renderDetalheField('Tipo de telhado', dados.tipoTelhadoLabel || dados.tipoTelhadoOutro || dados.tipoTelhado),
+    renderDetalheField('Sombreamento', dados.sombreamento),
+    renderDetalheField('Descrição do sombreamento', dados.sombreamentoDescricao, { full: true })
+  ].join('');
+
+  return renderDetalheSection('Dados de consumo', fields);
+}
+
+function renderClienteDefinicaoPerfilHtml(perfil) {
+  if (!perfil) return '';
+
+  const quemContato = perfil.quemContato === 'cliente'
+    ? 'Cliente'
+    : perfil.quemContato === 'vendedor'
+      ? 'Vendedor'
+      : perfil.quemContato;
+
+  const fields = [
+    renderDetalheField('Quem entrou em contato', quemContato),
+    renderDetalheField('Origem do contato', perfil.origemClienteLabel),
+    renderDetalheField('Canal do vendedor', perfil.canalVendedorLabel),
+    renderDetalheField('Comportamento do cliente', perfil.comportamentoVendedorLabel),
+    renderDetalheField('Interesse do cliente', perfil.interesseCliente, { full: true }),
+    renderDetalheField('Urgência', perfil.urgencia),
+    renderDetalheField('Responsável pela decisão', perfil.decisaoEnvolvidos),
+    renderDetalheField('Outros decisores', perfil.decisaoOutrosLabels),
+    renderDetalheField('Descrição do decisor', perfil.decisaoOutroText),
+    renderDetalheField('Já recebeu outras propostas', perfil.outrasPropostas),
+    renderDetalheField('Disponibilizou propostas', perfil.propostasDisponibilizou),
+    renderDetalheField('Valoriza família', perfil.valorizaFamilia),
+    renderDetalheField('Tem pets', perfil.temPets),
+    renderDetalheField('Outros interesses', perfil.outrosInteresses, { full: true }),
+    renderDetalheField('Serviços adicionais', perfil.servicosAdicionais, { full: true }),
+    renderDetalheField('Forma de pagamento', perfil.formaPagamentoLabel),
+    renderDetalheField('Características', perfil.caracteristicasLabels),
+    renderDetalheField('Perfil técnico', perfil.perfilTecnicoLabels),
+    renderDetalheField('Prioridade principal', perfil.prioridadePrincipalLabel),
+    renderDetalheField('Perfil financeiro', perfil.perfilFinanceiroLabels),
+    renderDetalheField('Comportamento na negociação', perfil.comportamentoNegociacaoLabels),
+    renderDetalheField('Disponibilidade de tempo', perfil.disponibilidadeTempoLabels),
+    renderDetalheField('Confiança em energia solar', perfil.confiancaSolarLabels),
+    renderDetalheField('Perfil dominante', perfil.perfilDominanteLabel)
+  ].join('');
+
+  return renderDetalheSection('Definição de perfil', fields);
+}
+
 function renderClienteDetalheHtml(cliente) {
   const registro = cliente.carimbo || cliente.data || '—';
   const loc = cliente.lat != null && cliente.lng != null
     ? `${formatCoords(cliente.lat, cliente.lng)} (precisão ~${cliente.accuracy || '?'}m)`
-    : '—';
-  const arqCount = countArquivos(cliente.arquivos);
+    : '';
+  const statusLabel = STATUS_LABELS[cliente.status]?.label || cliente.status || '—';
+
+  const geral = [
+    renderDetalheField('WhatsApp', formatWhatsAppCliente(cliente.whatsapp)),
+    renderDetalheField('Endereço', cliente.endereco, { wide: true }),
+    renderDetalheField('Status', statusLabel),
+    renderDetalheField('Data de retorno', formatDataRetorno(cliente.dataRetorno)),
+    renderDetalheField('Tipo de retorno', cliente.tipoRetornoLabel),
+    renderDetalheField('Etapa na trilha', getEtapaTrilhaLabel(getClienteEtapaTrilha(cliente))),
+    renderDetalheField('Registro', registro),
+    renderDetalheField('Localização', loc),
+    renderDetalheField('Observação', cliente.observacao, { full: true }),
+    renderDetalheField('Cadastrado em', cliente.criadoEm ? formatCarimbo(new Date(cliente.criadoEm)) : '')
+  ].join('');
+
+  const anexosHtml = renderClienteAnexosHtml(cliente.arquivos);
 
   return `
-    <div class="cliente-detalhe-grid">
-      <div class="cliente-detalhe-item">
-        <span class="cliente-detalhe-label">WhatsApp</span>
-        <span class="cliente-detalhe-value">${formatWhatsAppCliente(cliente.whatsapp)}</span>
-      </div>
-      <div class="cliente-detalhe-item cliente-detalhe-item-wide">
-        <span class="cliente-detalhe-label">Endereço</span>
-        <span class="cliente-detalhe-value">${cliente.endereco || '—'}</span>
-      </div>
-      <div class="cliente-detalhe-item">
-        <span class="cliente-detalhe-label">Tipo de retorno</span>
-        <span class="cliente-detalhe-value">${cliente.tipoRetornoLabel || '—'}</span>
-      </div>
-      <div class="cliente-detalhe-item">
-        <span class="cliente-detalhe-label">Etapa na trilha</span>
-        <span class="cliente-detalhe-value">${getEtapaTrilhaLabel(getClienteEtapaTrilha(cliente))}</span>
-      </div>
-      <div class="cliente-detalhe-item">
-        <span class="cliente-detalhe-label">Registro</span>
-        <span class="cliente-detalhe-value">${registro}</span>
-      </div>
-      <div class="cliente-detalhe-item">
-        <span class="cliente-detalhe-label">Localização</span>
-        <span class="cliente-detalhe-value">${loc}</span>
-      </div>
-      <div class="cliente-detalhe-item cliente-detalhe-item-full">
-        <span class="cliente-detalhe-label">Observação</span>
-        <span class="cliente-detalhe-value">${cliente.observacao || '—'}</span>
-      </div>
-      ${arqCount ? `
-        <div class="cliente-detalhe-item">
-          <span class="cliente-detalhe-label">Anexos</span>
-          <span class="cliente-detalhe-value">${arqCount} arquivo(s)</span>
-        </div>
-      ` : ''}
+    <div class="cliente-detalhe-wrap">
+      ${renderDetalheSection('Dados gerais', geral)}
+      ${renderClienteDefinicaoPerfilHtml(cliente.definicaoPerfil)}
+      ${renderClienteDadosConsumoHtml(cliente.dadosConsumo)}
+      <section class="cliente-detalhe-section">
+        <h4 class="cliente-detalhe-section-title">Anexos</h4>
+        ${anexosHtml}
+      </section>
     </div>
   `;
 }
