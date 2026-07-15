@@ -123,6 +123,60 @@ router.post('/clientes', async (req, res, next) => {
   }
 });
 
+router.patch('/clientes/:id', async (req, res, next) => {
+  try {
+    const cpf = onlyDigits(req.user.cpf);
+    const id = Number.parseInt(req.params.id, 10);
+    const { arquivos } = req.body || {};
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Registro inválido.' });
+    }
+
+    if (!arquivos || typeof arquivos !== 'object') {
+      return res.status(400).json({ error: 'Anexos inválidos.' });
+    }
+
+    const existing = await query(
+      `SELECT id, dados FROM vendedor_clientes
+       WHERE id = $1 AND vendedor_cpf = $2`,
+      [id, cpf]
+    );
+
+    if (!existing.rows.length) {
+      return res.status(404).json({ error: 'Registro não encontrado.' });
+    }
+
+    if (existing.rows[0].dados?.tipoRegistro === 'pap') {
+      return res.status(403).json({ error: 'Anexos de PAP não podem ser editados aqui.' });
+    }
+
+    const dados = {
+      ...existing.rows[0].dados,
+      arquivos
+    };
+
+    const updated = await query(
+      `UPDATE vendedor_clientes
+       SET dados = $1::jsonb
+       WHERE id = $2 AND vendedor_cpf = $3
+       RETURNING id, dados, criado_em`,
+      [JSON.stringify(dados), id, cpf]
+    );
+
+    const row = updated.rows[0];
+    res.json({
+      cliente: {
+        id: row.id,
+        ...row.dados,
+        criadoEm: row.criado_em ? row.criado_em.toISOString() : null
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.delete('/clientes/:id', async (req, res, next) => {
   try {
     const cpf = onlyDigits(req.user.cpf);

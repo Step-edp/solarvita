@@ -1835,6 +1835,129 @@ function getAnexoImageSrc(file) {
   return file?.url || file?.preview || null;
 }
 
+function anexoHasStoredFile(file) {
+  return Boolean(file?.url || file?.preview);
+}
+
+function getAnexoAcceptType(file) {
+  if (isImageFile(file)) return 'image/*';
+  if (file?.type === 'application/pdf') return '.pdf,application/pdf';
+  if ((file?.type || '').startsWith('video/')) return 'video/*';
+  return '*/*';
+}
+
+function normalizeArquivos(arquivos) {
+  if (!arquivos) return {};
+  const copy = JSON.parse(JSON.stringify(arquivos));
+  if (copy.contaLuz && !Array.isArray(copy.contaLuz)) {
+    copy.contaLuz = [copy.contaLuz];
+  }
+  return copy;
+}
+
+function getAnexoAtPath(arquivos, path) {
+  if (!arquivos || !path) return null;
+  const arq = normalizeArquivos(arquivos);
+  const [section, key] = path.split(':');
+  if (section === 'video') return arq.video || null;
+  if (section === 'drone') return arq.drone?.[key] || null;
+  if (section === 'contaLuz' || section === 'extras') {
+    const idx = Number.parseInt(key, 10);
+    return Array.isArray(arq[section]) ? arq[section][idx] || null : null;
+  }
+  return null;
+}
+
+function setAnexoAtPath(arquivos, path, value) {
+  const arq = normalizeArquivos(arquivos || {});
+  const [section, key] = path.split(':');
+
+  if (section === 'video') {
+    arq.video = value;
+    return arq;
+  }
+
+  if (section === 'drone') {
+    arq.drone = arq.drone || {};
+    arq.drone[key] = value;
+    return arq;
+  }
+
+  if (section === 'contaLuz' || section === 'extras') {
+    const idx = Number.parseInt(key, 10);
+    arq[section] = arq[section] || [];
+    arq[section][idx] = value;
+    return arq;
+  }
+
+  return arq;
+}
+
+function countMissingAnexoFiles(arquivos) {
+  if (!arquivos) return 0;
+  let count = 0;
+
+  const contas = Array.isArray(arquivos.contaLuz)
+    ? arquivos.contaLuz
+    : (arquivos.contaLuz ? [arquivos.contaLuz] : []);
+  contas.forEach((conta) => {
+    if (conta?.name && !anexoHasStoredFile(conta)) count += 1;
+  });
+
+  Object.values(arquivos.drone || {}).forEach((drone) => {
+    if (drone?.name && !anexoHasStoredFile(drone)) count += 1;
+  });
+
+  (arquivos.extras || []).forEach((extra) => {
+    if (extra?.name && !anexoHasStoredFile(extra)) count += 1;
+  });
+
+  if (arquivos.video?.name && !anexoHasStoredFile(arquivos.video)) count += 1;
+
+  return count;
+}
+
+async function handleClienteAnexoUpload(input) {
+  const clienteId = input.dataset.clienteId;
+  const anexoPath = input.dataset.anexoPath;
+  const file = input.files?.[0];
+  if (!file || !clienteId || !anexoPath) return;
+
+  const cliente = VENDEDOR_CLIENTES.find((item) => String(item.id) === String(clienteId));
+  if (!cliente) return;
+
+  const uploadBtn = input.closest('.cliente-anexo-upload');
+  if (uploadBtn) uploadBtn.classList.add('is-loading');
+
+  try {
+    const uploaded = await buildFileInfo(file);
+    const current = getAnexoAtPath(cliente.arquivos, anexoPath) || {};
+    const arquivos = setAnexoAtPath(cliente.arquivos, anexoPath, {
+      ...current,
+      ...uploaded,
+      name: uploaded.name || current.name,
+      label: current.label,
+      nomeConta: current.nomeConta
+    });
+
+    if (SOLARVITA_CONFIG.useDatabase) {
+      const data = await SolarVitaAPI.updateVendedorCliente(clienteId, { arquivos });
+      const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(clienteId));
+      if (idx >= 0) VENDEDOR_CLIENTES[idx] = data.cliente;
+    } else {
+      cliente.arquivos = arquivos;
+      saveVendedorClientes();
+    }
+
+    refreshClientesBaseUI();
+  } catch (err) {
+    window.alert(err.message || 'Não foi possível enviar o arquivo.');
+  } finally {
+    if (uploadBtn) uploadBtn.classList.remove('is-loading');
+    input.value = '';
+  }
+}
+
 async function collectContasLuzAsync(form) {
   const contas = [];
   for (const item of form.querySelectorAll('.conta-luz-item')) {
@@ -2206,10 +2329,14 @@ function getFileIcon(type = '') {
   return '📎';
 }
 
-function renderAnexoItem(file, label = '') {
+function renderAnexoItem(file, label = '', ctx = {}) {
   if (!file?.name) return '';
+  const { clienteId, anexoPath } = ctx;
   const isImage = isImageFile(file);
   const imageSrc = isImage ? getAnexoImageSrc(file) : null;
+  const missingFile = !anexoHasStoredFile(file);
+  const canUpload = Boolean(clienteId && anexoPath && missingFile);
+  const accept = getAnexoAcceptType(file);
   let previewHtml;
 
   if (imageSrc) {
@@ -2217,15 +2344,19 @@ function renderAnexoItem(file, label = '') {
         <img src="${imageSrc}" alt="${escapeHtml(file.name)}" loading="lazy">
       </a>`;
   } else if (isImage) {
-    previewHtml = `<div class="cliente-anexo-thumb cliente-anexo-thumb-missing" title="Foto não disponível — cadastre o cliente novamente para exibir a imagem">
+    previewHtml = `<div class="cliente-anexo-thumb cliente-anexo-thumb-missing">
         <span class="cliente-anexo-missing-label">Foto indisponível</span>
+        ${canUpload ? renderAnexoUploadButton(clienteId, anexoPath, accept) : ''}
       </div>`;
   } else {
-    previewHtml = `<span class="cliente-anexo-icon" aria-hidden="true">${getFileIcon(file.type || '')}</span>`;
+    previewHtml = `<div class="cliente-anexo-file-fallback">
+        <span class="cliente-anexo-icon" aria-hidden="true">${getFileIcon(file.type || '')}</span>
+        ${canUpload ? renderAnexoUploadButton(clienteId, anexoPath, accept) : ''}
+      </div>`;
   }
 
   return `
-    <li class="cliente-anexo-item${imageSrc || isImage ? ' has-preview' : ''}">
+    <li class="cliente-anexo-item${imageSrc || isImage ? ' has-preview' : ''}${canUpload ? ' can-upload' : ''}">
       ${previewHtml}
       <div class="cliente-anexo-info">
         ${label ? `<span class="cliente-anexo-label">${escapeHtml(label)}</span>` : ''}
@@ -2236,7 +2367,17 @@ function renderAnexoItem(file, label = '') {
   `;
 }
 
-function renderClienteAnexosHtml(arquivos) {
+function renderAnexoUploadButton(clienteId, anexoPath, accept) {
+  return `
+    <label class="cliente-anexo-upload">
+      <input type="file" class="cliente-anexo-input" accept="${accept}" hidden
+        data-cliente-id="${escapeHtml(String(clienteId))}" data-anexo-path="${escapeHtml(anexoPath)}">
+      <span class="cliente-anexo-upload-text">Enviar arquivo</span>
+    </label>
+  `;
+}
+
+function renderClienteAnexosHtml(arquivos, clienteId = '') {
   if (!arquivos) {
     return '<p class="cliente-detalhe-empty">Nenhum anexo.</p>';
   }
@@ -2246,31 +2387,48 @@ function renderClienteAnexosHtml(arquivos) {
     ? arquivos.contaLuz
     : (arquivos.contaLuz ? [arquivos.contaLuz] : []);
 
-  contas.forEach((conta) => {
+  contas.forEach((conta, index) => {
     if (!conta?.name) return;
     const label = conta.nomeConta ? `Conta de luz — ${conta.nomeConta}` : 'Conta de luz';
-    items.push(renderAnexoItem(conta, label));
+    items.push(renderAnexoItem(conta, label, {
+      clienteId,
+      anexoPath: `contaLuz:${index}`
+    }));
   });
 
-  Object.values(arquivos.drone || {}).forEach((drone) => {
+  Object.entries(arquivos.drone || {}).forEach(([slotId, drone]) => {
     if (!drone?.name) return;
-    items.push(renderAnexoItem(drone, `Drone — ${drone.label || 'Foto'}`));
+    items.push(renderAnexoItem(drone, `Drone — ${drone.label || 'Foto'}`, {
+      clienteId,
+      anexoPath: `drone:${slotId}`
+    }));
   });
 
-  (arquivos.extras || []).forEach((extra) => {
+  (arquivos.extras || []).forEach((extra, index) => {
     if (!extra?.name) return;
-    items.push(renderAnexoItem(extra, 'Demais fotos'));
+    items.push(renderAnexoItem(extra, 'Demais fotos', {
+      clienteId,
+      anexoPath: `extras:${index}`
+    }));
   });
 
   if (arquivos.video?.name) {
-    items.push(renderAnexoItem(arquivos.video, 'Vídeo'));
+    items.push(renderAnexoItem(arquivos.video, 'Vídeo', {
+      clienteId,
+      anexoPath: 'video:0'
+    }));
   }
 
   if (!items.length) {
     return '<p class="cliente-detalhe-empty">Nenhum anexo.</p>';
   }
 
-  return `<ul class="cliente-anexos-list">${items.join('')}</ul>`;
+  const missingCount = countMissingAnexoFiles(arquivos);
+  const notice = missingCount && clienteId
+    ? `<p class="cliente-anexos-notice">${missingCount} anexo(s) sem arquivo salvo. Use <strong>Enviar arquivo</strong> em cada item para atualizar.</p>`
+    : '';
+
+  return `${notice}<ul class="cliente-anexos-list">${items.join('')}</ul>`;
 }
 
 function renderClienteDadosConsumoHtml(dados) {
@@ -2365,7 +2523,7 @@ function renderClienteDetalheHtml(cliente) {
     renderDetalheField('Cadastrado em', cliente.criadoEm ? formatCarimbo(new Date(cliente.criadoEm)) : '')
   ].join('');
 
-  const anexosHtml = renderClienteAnexosHtml(cliente.arquivos);
+  const anexosHtml = renderClienteAnexosHtml(cliente.arquivos, cliente.id);
 
   return `
     <div class="cliente-detalhe-wrap">
@@ -2473,6 +2631,11 @@ function initClientesTrilhaHandlers(root = document) {
   root.dataset.trilhaBound = 'true';
 
   root.addEventListener('click', (event) => {
+    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input')) {
+      event.stopPropagation();
+      return;
+    }
+
     const row = event.target.closest('[data-cliente-row]');
     if (row && root.contains(row)) {
       const rowId = row.dataset.clienteRow;
@@ -2487,6 +2650,13 @@ function initClientesTrilhaHandlers(root = document) {
     const etapa = btn.dataset.etapaTrilha;
     clientesFiltroEtapa = clientesFiltroEtapa === etapa ? '' : etapa;
     refreshClientesBaseUI();
+  });
+
+  root.addEventListener('change', (event) => {
+    const input = event.target.closest('.cliente-anexo-input');
+    if (!input || !root.contains(input)) return;
+    event.stopPropagation();
+    handleClienteAnexoUpload(input);
   });
 
   root.addEventListener('keydown', (event) => {

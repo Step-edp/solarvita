@@ -1502,6 +1502,56 @@ body.auth-page {
   padding: 0.5rem;
 }
 
+.cliente-anexo-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-navy);
+  background: #fff;
+  border: 1px solid rgba(0, 27, 77, 0.15);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.cliente-anexo-upload:hover {
+  background: #f0f4fa;
+  border-color: rgba(0, 27, 77, 0.25);
+}
+
+.cliente-anexo-upload.is-loading {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.cliente-anexo-thumb-missing {
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cliente-anexo-file-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.75rem 0.5rem 0.5rem;
+}
+
+.cliente-anexos-notice {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(0, 27, 77, 0.72);
+  background: #fff8e6;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  border-radius: var(--radius-sm);
+}
+
 .cliente-anexo-item.has-preview .cliente-anexo-info {
   padding: 0.65rem 0.75rem;
 }

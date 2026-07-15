@@ -105,6 +105,13 @@ const SolarVitaAPI = {
     return data;
   },
 
+  updateVendedorCliente(id, dados) {
+    return this.request(`/vendedor/clientes/${id}`, {
+      method: 'PATCH',
+      body: dados
+    });
+  },
+
   deleteVendedorCliente(id) {
     return this.request(`/vendedor/clientes/${id}`, {
       method: 'DELETE'
