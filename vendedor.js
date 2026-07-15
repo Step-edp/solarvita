@@ -2600,6 +2600,56 @@ function renderClienteDetalheHtml(cliente) {
   `;
 }
 
+function renderProspectadoAcoesHtml(cliente) {
+  if (cliente.status !== 'prospectado' || cliente.id == null) return '';
+
+  const possuiFotoActive = cliente.possuiFoto ? ' is-active' : '';
+
+  return `
+    <div class="cliente-prospectado-acoes">
+      <button type="button" class="btn-prospectado-acao btn-possui-foto${possuiFotoActive}" data-acao-prospectado="possui-foto" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Marcar que possui foto">
+        Possui foto
+      </button>
+      <button type="button" class="btn-prospectado-acao btn-inviavel" data-acao-prospectado="inviavel" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Marcar como inviável">
+        Inviável
+      </button>
+    </div>
+  `;
+}
+
+async function handleProspectadoAcao(clienteId, acao) {
+  const cliente = findClienteById(clienteId);
+  if (!cliente || cliente.status !== 'prospectado') return;
+
+  let payload;
+  if (acao === 'possui-foto') {
+    if (cliente.possuiFoto) return;
+    payload = { possuiFoto: true };
+  } else if (acao === 'inviavel') {
+    payload = { inviavel: true, status: 'perdido' };
+  } else {
+    return;
+  }
+
+  try {
+    if (SOLARVITA_CONFIG.useDatabase) {
+      const data = await SolarVitaAPI.updateVendedorCliente(clienteId, payload);
+      const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(clienteId));
+      if (idx >= 0) VENDEDOR_CLIENTES[idx] = data.cliente;
+    } else {
+      Object.assign(cliente, payload);
+      saveVendedorClientes();
+    }
+
+    syncVisitasFromClientes();
+    refreshClientesUI();
+    refreshClientesBaseUI();
+    rebuildVendedorMapMarkers();
+  } catch (err) {
+    window.alert(err.message || 'Não foi possível atualizar o cliente.');
+  }
+}
+
 function renderClientesBaseTableRows(clientes, { extended = false, expandedId = '' } = {}) {
   if (!clientes.length) {
     const cols = extended ? 3 : 5;
@@ -2619,6 +2669,10 @@ function renderClientesBaseTableRows(clientes, { extended = false, expandedId = 
     const arqBadge = arqCount
       ? `<span class="arq-badge" title="${arqCount} arquivo(s) anexado(s)">📎 ${arqCount}</span>`
       : '';
+    const fotoBadge = c.possuiFoto
+      ? '<span class="cliente-foto-badge" title="Possui foto">📷</span>'
+      : '';
+    const prospectadoAcoes = renderProspectadoAcoesHtml(c);
     const rowId = getClienteRowId(c, index);
     const isOpen = expandedId === rowId;
 
@@ -2627,9 +2681,12 @@ function renderClientesBaseTableRows(clientes, { extended = false, expandedId = 
         <tr class="cliente-row${isOpen ? ' is-open' : ''}" data-cliente-row="${rowId}" tabindex="0" role="button" aria-expanded="${isOpen ? 'true' : 'false'}">
           <td class="cliente-nome-cell">
             <span class="cliente-row-chevron" aria-hidden="true">${isOpen ? '▾' : '▸'}</span>
-            <strong>${c.nome}</strong>${arqBadge}
+            <strong>${c.nome}</strong>${fotoBadge}${arqBadge}
           </td>
-          <td><span class="status-badge ${st.class}">${st.label}</span></td>
+          <td class="cliente-status-cell">
+            <span class="status-badge ${st.class}">${st.label}</span>
+            ${prospectadoAcoes}
+          </td>
           <td>${formatDataRetorno(c.dataRetorno)}</td>
         </tr>
         <tr class="cliente-detalhe-row" data-cliente-detalhe="${rowId}" ${isOpen ? '' : 'hidden'}>
@@ -2693,8 +2750,14 @@ function initClientesTrilhaHandlers(root = document) {
   root.dataset.trilhaBound = 'true';
 
   root.addEventListener('click', (event) => {
-    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .btn-editar-cliente')) {
+    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .btn-editar-cliente, .cliente-prospectado-acoes, .btn-prospectado-acao')) {
       event.stopPropagation();
+    }
+
+    const acaoBtn = event.target.closest('[data-acao-prospectado]');
+    if (acaoBtn && root.contains(acaoBtn)) {
+      handleProspectadoAcao(acaoBtn.dataset.clienteId, acaoBtn.dataset.acaoProspectado);
+      return;
     }
 
     const editBtn = event.target.closest('[data-edit-cliente]');
@@ -2704,7 +2767,7 @@ function initClientesTrilhaHandlers(root = document) {
       return;
     }
 
-    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input')) {
+    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .cliente-prospectado-acoes, .btn-prospectado-acao')) {
       return;
     }
 

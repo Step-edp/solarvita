@@ -280,7 +280,11 @@ router.patch('/clientes/:id', async (req, res, next) => {
       'observacao',
       'dadosConsumo',
       'definicaoPerfil',
-      'arquivos'
+      'arquivos',
+      'status',
+      'possuiFoto',
+      'inviavel',
+      'etapaTrilha'
     ];
 
     const dados = { ...existing.rows[0].dados };
