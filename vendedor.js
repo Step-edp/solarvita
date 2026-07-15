@@ -2052,13 +2052,71 @@ function renderClientesTrilhaHtml(list, activeEtapa = '') {
   }).join('');
 }
 
-function renderClientesBaseTableRows(clientes, { extended = false } = {}) {
+let clientesFiltroEtapa = '';
+let expandedClienteRowId = '';
+
+function getClienteRowId(cliente, index) {
+  return cliente.id != null ? String(cliente.id) : `row-${index}`;
+}
+
+function getEtapaTrilhaLabel(etapaId) {
+  return CLIENTE_TRILHA_ETAPAS.find((etapa) => etapa.id === etapaId)?.label || '—';
+}
+
+function renderClienteDetalheHtml(cliente) {
+  const registro = cliente.carimbo || cliente.data || '—';
+  const loc = cliente.lat != null && cliente.lng != null
+    ? `${formatCoords(cliente.lat, cliente.lng)} (precisão ~${cliente.accuracy || '?'}m)`
+    : '—';
+  const arqCount = countArquivos(cliente.arquivos);
+
+  return `
+    <div class="cliente-detalhe-grid">
+      <div class="cliente-detalhe-item">
+        <span class="cliente-detalhe-label">WhatsApp</span>
+        <span class="cliente-detalhe-value">${formatWhatsAppCliente(cliente.whatsapp)}</span>
+      </div>
+      <div class="cliente-detalhe-item cliente-detalhe-item-wide">
+        <span class="cliente-detalhe-label">Endereço</span>
+        <span class="cliente-detalhe-value">${cliente.endereco || '—'}</span>
+      </div>
+      <div class="cliente-detalhe-item">
+        <span class="cliente-detalhe-label">Tipo de retorno</span>
+        <span class="cliente-detalhe-value">${cliente.tipoRetornoLabel || '—'}</span>
+      </div>
+      <div class="cliente-detalhe-item">
+        <span class="cliente-detalhe-label">Etapa na trilha</span>
+        <span class="cliente-detalhe-value">${getEtapaTrilhaLabel(getClienteEtapaTrilha(cliente))}</span>
+      </div>
+      <div class="cliente-detalhe-item">
+        <span class="cliente-detalhe-label">Registro</span>
+        <span class="cliente-detalhe-value">${registro}</span>
+      </div>
+      <div class="cliente-detalhe-item">
+        <span class="cliente-detalhe-label">Localização</span>
+        <span class="cliente-detalhe-value">${loc}</span>
+      </div>
+      <div class="cliente-detalhe-item cliente-detalhe-item-full">
+        <span class="cliente-detalhe-label">Observação</span>
+        <span class="cliente-detalhe-value">${cliente.observacao || '—'}</span>
+      </div>
+      ${arqCount ? `
+        <div class="cliente-detalhe-item">
+          <span class="cliente-detalhe-label">Anexos</span>
+          <span class="cliente-detalhe-value">${arqCount} arquivo(s)</span>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderClientesBaseTableRows(clientes, { extended = false, expandedId = '' } = {}) {
   if (!clientes.length) {
-    const cols = extended ? 8 : 5;
+    const cols = extended ? 3 : 5;
     return `<tr><td colspan="${cols}" class="clientes-empty">Nenhum cliente encontrado.</td></tr>`;
   }
 
-  return clientes.map((c) => {
+  return clientes.map((c, index) => {
     const st = STATUS_LABELS[c.status];
     const registro = c.carimbo || c.data;
     const obs = c.observacao
@@ -2071,18 +2129,21 @@ function renderClientesBaseTableRows(clientes, { extended = false } = {}) {
     const arqBadge = arqCount
       ? `<span class="arq-badge" title="${arqCount} arquivo(s) anexado(s)">📎 ${arqCount}</span>`
       : '';
+    const rowId = getClienteRowId(c, index);
+    const isOpen = expandedId === rowId;
 
     if (extended) {
       return `
-        <tr>
-          <td><strong>${c.nome}</strong>${arqBadge}</td>
-          <td>${formatWhatsAppCliente(c.whatsapp)}</td>
-          <td>${c.endereco}</td>
+        <tr class="cliente-row${isOpen ? ' is-open' : ''}" data-cliente-row="${rowId}" tabindex="0" role="button" aria-expanded="${isOpen ? 'true' : 'false'}">
+          <td class="cliente-nome-cell">
+            <span class="cliente-row-chevron" aria-hidden="true">${isOpen ? '▾' : '▸'}</span>
+            <strong>${c.nome}</strong>${arqBadge}
+          </td>
           <td><span class="status-badge ${st.class}">${st.label}</span></td>
           <td>${formatDataRetorno(c.dataRetorno)}</td>
-          <td>${c.tipoRetornoLabel || '—'}</td>
-          <td class="col-registro">${registro}${loc ? `<br>${loc}` : ''}</td>
-          <td>${obs}</td>
+        </tr>
+        <tr class="cliente-detalhe-row" data-cliente-detalhe="${rowId}" ${isOpen ? '' : 'hidden'}>
+          <td colspan="3">${renderClienteDetalheHtml(c)}</td>
         </tr>
       `;
     }
@@ -2109,7 +2170,14 @@ function refreshClientesBaseUI() {
   const resumoEl = document.getElementById('clientes-resumo-stats');
   const trilhaEl = document.getElementById('clientes-trilha');
 
-  if (tbody) tbody.innerHTML = renderClientesBaseTableRows(filtrados, { extended: true });
+  if (tbody) {
+    const stillVisible = filtrados.some((cliente, index) => getClienteRowId(cliente, index) === expandedClienteRowId);
+    if (!stillVisible) expandedClienteRowId = '';
+    tbody.innerHTML = renderClientesBaseTableRows(filtrados, {
+      extended: true,
+      expandedId: expandedClienteRowId
+    });
+  }
   if (countEl) {
     countEl.textContent = filtrados.length === clientesBase.length
       ? `${clientesBase.length} clientes`
@@ -2135,11 +2203,29 @@ function initClientesTrilhaHandlers(root = document) {
   root.dataset.trilhaBound = 'true';
 
   root.addEventListener('click', (event) => {
+    const row = event.target.closest('[data-cliente-row]');
+    if (row && root.contains(row)) {
+      const rowId = row.dataset.clienteRow;
+      expandedClienteRowId = expandedClienteRowId === rowId ? '' : rowId;
+      refreshClientesBaseUI();
+      return;
+    }
+
     const btn = event.target.closest('[data-etapa-trilha]');
     if (!btn || !root.contains(btn)) return;
 
     const etapa = btn.dataset.etapaTrilha;
     clientesFiltroEtapa = clientesFiltroEtapa === etapa ? '' : etapa;
+    refreshClientesBaseUI();
+  });
+
+  root.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const row = event.target.closest('[data-cliente-row]');
+    if (!row || !root.contains(row)) return;
+    event.preventDefault();
+    const rowId = row.dataset.clienteRow;
+    expandedClienteRowId = expandedClienteRowId === rowId ? '' : rowId;
     refreshClientesBaseUI();
   });
 }
@@ -3467,6 +3553,7 @@ function initVendedorMap() {
 async function renderVendedorClientesPage(session) {
   await syncVendedorClientesFromApi();
   clientesFiltroEtapa = '';
+  expandedClienteRowId = '';
 
   const panel = document.getElementById('panel-clientes');
   if (!panel) return;
@@ -3515,13 +3602,8 @@ async function renderVendedorClientesPage(session) {
           <thead>
             <tr>
               <th>Cliente</th>
-              <th>WhatsApp</th>
-              <th>Endereço</th>
               <th>Status</th>
               <th>Retorno</th>
-              <th>Tipo de retorno</th>
-              <th>Registro / Local</th>
-              <th>Observação</th>
             </tr>
           </thead>
           <tbody id="clientes-base-tbody"></tbody>
