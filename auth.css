@@ -1060,30 +1060,46 @@ body.auth-page {
 
 .clientes-trilha-wrap {
   margin-bottom: 1.25rem;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 0.25rem;
+  overflow: hidden;
 }
 
 .clientes-trilha {
-  display: flex;
-  align-items: center;
-  min-width: max-content;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.35rem 0.15rem;
+  width: 100%;
   background: var(--color-white);
   border-radius: var(--radius);
-  padding: 1rem 1.1rem;
+  padding: 0.9rem 0.65rem 0.75rem;
   box-shadow: 0 4px 20px rgba(0, 18, 51, 0.1);
 }
 
+.trilha-line {
+  position: absolute;
+  top: calc(0.9rem + 14px);
+  left: 5%;
+  right: 5%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 151, 57, 0.35) 0%,
+    rgba(0, 27, 77, 0.12) 100%
+  );
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .trilha-step {
-  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
-  min-width: 78px;
-  max-width: 92px;
-  padding: 0.15rem 0.35rem 0.35rem;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.1rem 0.05rem 0.25rem;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -1099,26 +1115,29 @@ body.auth-page {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: #eef2f8;
   border: 2px solid rgba(0, 27, 77, 0.12);
   color: rgba(0, 27, 77, 0.55);
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .trilha-step-label {
-  font-size: 0.68rem;
+  font-size: clamp(0.52rem, 0.72vw, 0.66rem);
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.2;
   text-align: center;
   color: rgba(0, 27, 77, 0.65);
+  width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .trilha-step-count {
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: var(--color-green-dark);
   line-height: 1;
@@ -1139,15 +1158,6 @@ body.auth-page {
 
 .trilha-step.is-active .trilha-step-label {
   color: var(--color-navy);
-}
-
-.trilha-connector {
-  flex: 0 0 18px;
-  height: 2px;
-  margin: 0 0.1rem;
-  margin-bottom: 2.4rem;
-  background: linear-gradient(90deg, rgba(0, 151, 57, 0.35), rgba(0, 27, 77, 0.12));
-  border-radius: 999px;
 }
 
 .clientes-base-section {
@@ -3187,9 +3197,30 @@ body.modal-open {
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .clientes-trilha {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.5rem 0.2rem;
+    padding: 0.85rem 0.5rem 0.65rem;
+  }
+
+  .trilha-line {
+    display: none;
+  }
+
+  .trilha-step-marker {
+    width: 26px;
+    height: 26px;
+  }
+
   .clientes-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@media (max-width: 480px) {
+  .clientes-trilha {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

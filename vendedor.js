@@ -2035,9 +2035,6 @@ function renderClientesTrilhaHtml(list, activeEtapa = '') {
   return CLIENTE_TRILHA_ETAPAS.map((etapa, index) => {
     const count = resumo[etapa.id] || 0;
     const isActive = activeEtapa === etapa.id;
-    const connector = index < CLIENTE_TRILHA_ETAPAS.length - 1
-      ? '<span class="trilha-connector" aria-hidden="true"></span>'
-      : '';
 
     return `
       <button
@@ -2051,7 +2048,6 @@ function renderClientesTrilhaHtml(list, activeEtapa = '') {
         <span class="trilha-step-label">${etapa.label}</span>
         <span class="trilha-step-count">${count}</span>
       </button>
-      ${connector}
     `;
   }).join('');
 }
@@ -2130,7 +2126,7 @@ function refreshClientesBaseUI() {
     `;
   }
   if (trilhaEl) {
-    trilhaEl.innerHTML = renderClientesTrilhaHtml(clientesBase, clientesFiltroEtapa);
+    trilhaEl.innerHTML = `<span class="trilha-line" aria-hidden="true"></span>${renderClientesTrilhaHtml(clientesBase, clientesFiltroEtapa)}`;
   }
 }
 
@@ -3490,7 +3486,9 @@ async function renderVendedorClientesPage(session) {
     <div id="clientes-resumo-stats" class="clientes-resumo-grid"></div>
 
     <div class="clientes-trilha-wrap">
-      <div id="clientes-trilha" class="clientes-trilha" role="list" aria-label="Trilha do cliente"></div>
+      <div id="clientes-trilha" class="clientes-trilha" role="list" aria-label="Trilha do cliente">
+        <span class="trilha-line" aria-hidden="true"></span>
+      </div>
     </div>
 
     <section class="vendedor-section clientes-base-section">
