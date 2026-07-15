@@ -721,10 +721,11 @@ function validateContasLuz(form) {
   for (const item of form.querySelectorAll('.conta-luz-item')) {
     const nomeConta = item.querySelector('.conta-luz-nome')?.value.trim();
     const hasFile = !!item.querySelector('.upload-input')?.files?.[0];
+    const hasExisting = item.dataset.existingAnexo === 'true';
     if (hasFile && !nomeConta) {
       return 'Informe o nome de cada conta de luz anexada.';
     }
-    if (nomeConta && !hasFile) {
+    if (nomeConta && !hasFile && !hasExisting) {
       return `Anexe o arquivo da conta "${nomeConta}".`;
     }
   }
@@ -1995,19 +1996,31 @@ async function collectContasLuzAsync(form) {
   for (const item of form.querySelectorAll('.conta-luz-item')) {
     const nomeConta = item.querySelector('.conta-luz-nome')?.value.trim();
     const file = item.querySelector('.upload-input')?.files?.[0];
-    if (nomeConta || file) {
+    let existing = null;
+    try {
+      existing = item.dataset.existingAnexoData
+        ? JSON.parse(item.dataset.existingAnexoData)
+        : null;
+    } catch {
+      existing = null;
+    }
+
+    if (nomeConta || file || existing) {
       const fileInfo = file ? await buildFileInfo(file) : {};
       contas.push({
-        nomeConta: nomeConta || '',
-        ...fileInfo
+        ...(existing || {}),
+        ...fileInfo,
+        nomeConta: nomeConta || existing?.nomeConta || ''
       });
     }
   }
   return contas;
 }
 
-async function collectArquivosAsync(form) {
-  const drone = {};
+async function collectArquivosAsync(form, existingArquivos = null) {
+  const existing = existingArquivos || {};
+  const drone = { ...(existing.drone || {}) };
+
   for (const s of DRONE_SLOTS) {
     const file = form.querySelector(`#drone-${s.id}`)?.files?.[0];
     if (file) {
@@ -2021,23 +2034,32 @@ async function collectArquivosAsync(form) {
   const extrasFiles = extrasZone?._files?.length
     ? extrasZone._files
     : Array.from(extrasInput?.files || []);
-  const extras = [];
+  const extras = [...(existing.extras || [])];
   for (const file of extrasFiles) {
     const info = await buildFileInfo(file);
     if (info) extras.push(info);
   }
 
   const videoFile = form.querySelector('#file-video')?.files?.[0];
-  const video = videoFile
-    ? { name: videoFile.name, type: videoFile.type, size: videoFile.size }
-    : null;
+  let video = existing.video || null;
+  if (videoFile) {
+    const info = await buildFileInfo(videoFile);
+    if (info) video = info;
+  }
 
-  return {
+  const result = {
     contaLuz: await collectContasLuzAsync(form),
     drone,
     extras,
     video
   };
+
+  if (!result.contaLuz.length) delete result.contaLuz;
+  if (!Object.keys(result.drone).length) delete result.drone;
+  if (!result.extras.length) delete result.extras;
+  if (!result.video) delete result.video;
+
+  return Object.keys(result).length ? result : null;
 }
 
 function countArquivos(arquivos) {
@@ -2559,6 +2581,11 @@ function renderClienteDetalheHtml(cliente) {
 
   return `
     <div class="cliente-detalhe-wrap">
+      <div class="cliente-detalhe-actions">
+        <button type="button" class="btn btn-outline-light btn-sm btn-editar-cliente" data-edit-cliente="${escapeHtml(String(cliente.id))}">
+          Editar informações
+        </button>
+      </div>
       ${renderDetalheSection('Dados gerais', geral)}
       ${renderClienteDefinicaoPerfilHtml(cliente.definicaoPerfil)}
       ${renderClienteDadosConsumoHtml(cliente.dadosConsumo)}
@@ -2663,8 +2690,18 @@ function initClientesTrilhaHandlers(root = document) {
   root.dataset.trilhaBound = 'true';
 
   root.addEventListener('click', (event) => {
-    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input')) {
+    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .btn-editar-cliente')) {
       event.stopPropagation();
+    }
+
+    const editBtn = event.target.closest('[data-edit-cliente]');
+    if (editBtn && root.contains(editBtn) && registrarClienteModalCtx) {
+      const cliente = findClienteById(editBtn.dataset.editCliente);
+      if (cliente) abrirModalEditarCliente(cliente, registrarClienteModalCtx);
+      return;
+    }
+
+    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input')) {
       return;
     }
 
@@ -2767,7 +2804,257 @@ function clearModalAlert(form) {
   }
 }
 
+let registrarClienteModalCtx = null;
+
+function findClienteById(id) {
+  return VENDEDOR_CLIENTES.find((cliente) => String(cliente.id) === String(id));
+}
+
+function clearClienteEditState(form, modalTitle) {
+  delete form.dataset.editClienteId;
+  delete form._editClienteOriginal;
+  if (modalTitle) modalTitle.textContent = 'Registrar cliente';
+}
+
+function setFormInput(form, selector, value) {
+  const el = form.querySelector(selector);
+  if (el != null && value != null && value !== '') el.value = value;
+}
+
+function setFormRadio(form, name, value) {
+  if (!value) return;
+  form.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+    input.checked = input.value === value;
+  });
+}
+
+function setFormCheckboxes(form, name, values = []) {
+  form.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+    input.checked = values.includes(input.value);
+  });
+}
+
+function setFormSelect(form, selector, value) {
+  const el = form.querySelector(selector);
+  if (el && value) el.value = value;
+}
+
+function populateContasLuzFromCliente(form, contas = []) {
+  const list = form.querySelector('#contas-luz-list');
+  if (!list) return;
+
+  const items = contas.length ? contas : [{}];
+  contaLuzIdCounter = 0;
+  list.innerHTML = items.map((_, index) => {
+    contaLuzIdCounter = index;
+    return renderContaLuzItem(index);
+  }).join('');
+
+  list.querySelectorAll('.conta-luz-item').forEach((item, index) => {
+    const conta = items[index] || {};
+    const nomeInput = item.querySelector('.conta-luz-nome');
+    if (nomeInput) nomeInput.value = conta.nomeConta || '';
+    if (conta.url || conta.preview) {
+      item.dataset.existingAnexo = 'true';
+      item.dataset.existingAnexoData = JSON.stringify(conta);
+    }
+    const zone = item.querySelector('.upload-zone');
+    if (zone) setupUploadZone(zone);
+  });
+
+  updateContaLuzRemoveButtons(list);
+}
+
+function populateDadosConsumoFromCliente(form, dados = {}) {
+  resetDadosConsumo(form);
+
+  const consumos = dados.consumos?.length ? dados.consumos : [{}];
+  const consumosList = form.querySelector('#consumos-list');
+  if (consumosList) {
+    consumoIdCounter = 0;
+    consumosList.innerHTML = consumos.map((_, index) => {
+      consumoIdCounter = index;
+      return renderConsumoItem(index);
+    }).join('');
+    consumosList.querySelectorAll('.consumo-item').forEach((item, index) => {
+      const consumo = consumos[index] || {};
+      const titulo = item.querySelector('.consumo-titulo');
+      const valor = item.querySelector('.consumo-valor');
+      if (titulo) titulo.value = consumo.titulo || '';
+      if (valor) valor.value = consumo.valor || '';
+    });
+  }
+
+  setFormRadio(form, 'aumentar-consumo', dados.pretendeAumentarConsumo ? 'sim' : 'nao');
+  if (dados.pretendeAumentarConsumo && dados.aumentoConsumo) {
+    setFormRadio(form, 'modo-aumento-consumo', dados.aumentoConsumo.modo || '');
+    setFormInput(form, '#consumo-aumento-kw', dados.aumentoConsumo.kw || '');
+
+    const equipamentos = dados.aumentoConsumo.equipamentos?.length
+      ? dados.aumentoConsumo.equipamentos
+      : [];
+    const equipList = form.querySelector('#equipamentos-list');
+    if (equipList && equipamentos.length) {
+      equipamentoIdCounter = 0;
+      equipList.innerHTML = equipamentos.map((_, index) => {
+        equipamentoIdCounter = index;
+        return renderEquipamentoItem(index);
+      }).join('');
+      equipList.querySelectorAll('.equipamento-item').forEach((item, index) => {
+        const equip = equipamentos[index] || {};
+        const nome = item.querySelector('.equipamento-nome');
+        const qtd = item.querySelector('.equipamento-qtd');
+        if (nome) nome.value = equip.nome || '';
+        if (qtd) qtd.value = equip.quantidade ?? '';
+      });
+    }
+  }
+
+  setFormRadio(form, 'cliente-genero', dados.clienteGenero || '');
+  setFormInput(form, '#consumo-cliente-idade', dados.clienteIdade || '');
+
+  const qtdCheckbox = form.querySelector('#consumo-qtd-nao-identificado');
+  const qtdInput = form.querySelector('#consumo-qtd-pessoas');
+  if (qtdCheckbox) qtdCheckbox.checked = Boolean(dados.qtdPessoasNaoIdentificado);
+  if (qtdInput) {
+    qtdInput.disabled = Boolean(dados.qtdPessoasNaoIdentificado);
+    qtdInput.value = dados.qtdPessoasImovel || '';
+  }
+
+  const ocupantes = dados.ocupantes?.length ? dados.ocupantes : [{}];
+  const ocupantesList = form.querySelector('#ocupantes-list');
+  if (ocupantesList) {
+    ocupanteIdCounter = 0;
+    ocupantesList.innerHTML = ocupantes.map((_, index) => {
+      ocupanteIdCounter = index;
+      return renderOcupanteItem(index);
+    }).join('');
+    ocupantesList.querySelectorAll('.ocupante-item').forEach((item, index) => {
+      const ocupante = ocupantes[index] || {};
+      const sexo = item.querySelector('.ocupante-sexo');
+      const parentesco = item.querySelector('.ocupante-parentesco');
+      const parentescoOutros = item.querySelector('.ocupante-parentesco-outros');
+      const idade = item.querySelector('.ocupante-idade');
+      if (sexo) sexo.value = ocupante.sexo || '';
+      if (parentesco) parentesco.value = ocupante.parentesco || '';
+      if (parentescoOutros) parentescoOutros.value = ocupante.parentescoOutros || '';
+      if (idade) idade.value = ocupante.idade ?? '';
+      if (parentesco) updateParentescoOutroWrap(parentesco);
+    });
+  }
+
+  setFormRadio(form, 'tipo-imovel', dados.tipoImovel || '');
+  setFormRadio(form, 'local-imovel', dados.localImovel || '');
+  setFormRadio(form, 'posse-imovel', dados.posseImovel || '');
+  setFormSelect(form, '#consumo-tipo-telhado', dados.tipoTelhado || '');
+  setFormInput(form, '#consumo-tipo-telhado-outro', dados.tipoTelhadoOutro || '');
+  setFormRadio(form, 'sombreamento', dados.sombreamento ? 'sim' : 'nao');
+  setFormInput(form, '#consumo-sombreamento-desc', dados.sombreamentoDescricao || '');
+
+  updateTelhadoOutroPanel(form);
+  updateQtdPessoasNaoIdentificado(form);
+  updateAumentoConsumoPanels(form);
+  updateSombreamentoPanel(form);
+}
+
+function populateDefinicaoPerfilFromCliente(form, perfil = {}) {
+  resetDefinicaoPerfil(form);
+
+  setFormRadio(form, 'quem-contato', perfil.quemContato || '');
+  setFormSelect(form, '#perfil-origem-cliente', perfil.origemCliente || '');
+  setFormInput(form, '#perfil-origem-cliente-outro', perfil.origemClienteOutro || '');
+  setFormSelect(form, '#perfil-canal-vendedor', perfil.canalVendedor || '');
+  setFormInput(form, '#perfil-canal-vendedor-outro', perfil.canalVendedorOutro || '');
+  setFormSelect(form, '#perfil-comportamento-vendedor', perfil.comportamentoVendedor || '');
+  setFormInput(form, '#perfil-comportamento-outro', perfil.comportamentoOutro || '');
+  setFormInput(form, '#perfil-interesse', perfil.interesseCliente || '');
+  setFormRadio(form, 'perfil-urgencia', perfil.urgencia || '');
+  setFormRadio(form, 'decisao-envolvidos', perfil.decisaoEnvolvidos || '');
+  setFormCheckboxes(form, 'decisao-outros', perfil.decisaoOutros || []);
+  setFormInput(form, '#perfil-decisao-outro', perfil.decisaoOutroText || '');
+  setFormRadio(form, 'perfil-outras-propostas', perfil.outrasPropostas || '');
+  setFormRadio(form, 'perfil-propostas-disponibilizou', perfil.propostasDisponibilizou || '');
+  setFormRadio(form, 'perfil-valoriza-familia', perfil.valorizaFamilia || '');
+  setFormRadio(form, 'perfil-tem-pets', perfil.temPets || '');
+  setFormInput(form, '#perfil-outros-interesses', perfil.outrosInteresses || '');
+  setFormInput(form, '#perfil-servicos-adicionais', perfil.servicosAdicionais || '');
+  setFormSelect(form, '#perfil-forma-pagamento', perfil.formaPagamento || '');
+  setFormCheckboxes(form, 'perfil-caracteristicas', perfil.caracteristicas || []);
+  setFormCheckboxes(form, 'perfil-tecnico', perfil.perfilTecnico || []);
+  setFormSelect(form, '#perfil-prioridade', perfil.prioridadePrincipal || '');
+  setFormCheckboxes(form, 'perfil-financeiro', perfil.perfilFinanceiro || []);
+  setFormCheckboxes(form, 'perfil-negociacao', perfil.comportamentoNegociacao || []);
+  setFormCheckboxes(form, 'perfil-disponibilidade', perfil.disponibilidadeTempo || []);
+  setFormCheckboxes(form, 'perfil-confianca-solar', perfil.confiancaSolar || []);
+  setFormSelect(form, '#perfil-dominante', perfil.perfilDominante || '');
+
+  updatePerfilContatoPanels(form);
+  updateOrigemClienteOutro(form);
+  updateCanalVendedorOutro(form);
+  updateComportamentoVendedorOutro(form);
+  updateDecisaoOutrosPanel(form);
+  updateDecisaoOutroText(form);
+  updatePropostasPanel(form);
+}
+
+function populateFormFromCliente(form, cliente, dataRetornoPicker) {
+  setFormInput(form, '#cliente-nome', cliente.nome || '');
+  setFormInput(form, '#cliente-endereco', cliente.endereco || '');
+  setFormInput(form, '#cliente-whatsapp', cliente.whatsapp || '');
+  setFormInput(form, '#cliente-observacao', cliente.observacao || '');
+
+  if (cliente.dataRetorno && dataRetornoPicker) {
+    dataRetornoPicker.setValue(cliente.dataRetorno);
+  } else {
+    dataRetornoPicker?.reset();
+  }
+
+  const tipoSelect = form.querySelector('#cliente-tipo-retorno');
+  const outrosWrap = form.querySelector('#cliente-tipo-retorno-outros-wrap');
+  const outrosInput = form.querySelector('#cliente-tipo-retorno-outros');
+  if (tipoSelect && cliente.tipoRetorno) {
+    tipoSelect.value = cliente.tipoRetorno;
+    if (cliente.tipoRetorno === 'outros') {
+      if (outrosWrap) outrosWrap.hidden = false;
+      if (outrosInput) outrosInput.value = cliente.tipoRetornoLabel || '';
+    } else if (outrosWrap) {
+      outrosWrap.hidden = true;
+      if (outrosInput) outrosInput.value = '';
+    }
+  }
+
+  const contas = Array.isArray(cliente.arquivos?.contaLuz)
+    ? cliente.arquivos.contaLuz
+    : (cliente.arquivos?.contaLuz ? [cliente.arquivos.contaLuz] : []);
+  populateContasLuzFromCliente(form, contas);
+  populateDadosConsumoFromCliente(form, cliente.dadosConsumo || {});
+  populateDefinicaoPerfilFromCliente(form, cliente.definicaoPerfil || {});
+}
+
+function abrirModalEditarCliente(cliente, ctx) {
+  const { form, modal, submitBtn, dataRetornoPicker, modalTitle } = ctx;
+  if (!form || !modal || !cliente?.id) return;
+
+  modal.hidden = false;
+  document.body.classList.add('modal-open');
+  clearModalAlert(form);
+  resetFilePreviews(form);
+  resetFormAccordion(form);
+  form._editClienteOriginal = JSON.parse(JSON.stringify(cliente));
+  form.dataset.editClienteId = String(cliente.id);
+
+  if (modalTitle) modalTitle.textContent = 'Editar cliente';
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Salvar alterações';
+
+  populateFormFromCliente(form, cliente, dataRetornoPicker);
+  expandAccordionPanel(form, 'dados-cliente');
+  form.querySelector('#cliente-nome')?.focus();
+}
+
 function abrirModalRegistrarCliente(form, modal, submitBtn, dataRetornoPicker, options = {}) {
+  const modalTitle = modal?.querySelector('.modal-header h2');
+  clearClienteEditState(form, modalTitle);
   modal.hidden = false;
   document.body.classList.add('modal-open');
   clearModalAlert(form);
@@ -2777,6 +3064,7 @@ function abrirModalRegistrarCliente(form, modal, submitBtn, dataRetornoPicker, o
   resetDefinicaoPerfil(form);
   resetTipoRetorno(form);
   resetFormAccordion(form);
+  dataRetornoPicker?.reset();
   submitBtn.disabled = false;
   submitBtn.textContent = 'Salvar cliente';
 
@@ -2789,7 +3077,7 @@ function abrirModalRegistrarCliente(form, modal, submitBtn, dataRetornoPicker, o
     expandAccordionPanel(form, 'definicao-perfil');
   }
 
-  form.querySelector('#cliente-nome').focus();
+  form.querySelector('#cliente-nome')?.focus();
 }
 
 function initRegistrarCliente() {
@@ -2808,6 +3096,9 @@ function initRegistrarCliente() {
   initTipoRetorno(form);
   initFormAccordion(form);
   const dataRetornoPicker = initModernDatePicker(form.querySelector('[data-date-picker]'));
+  const modalTitle = modal.querySelector('.modal-header h2');
+
+  registrarClienteModalCtx = { form, modal, submitBtn, dataRetornoPicker, modalTitle };
 
   btn.addEventListener('click', () => {
     abrirModalRegistrarCliente(form, modal, submitBtn, dataRetornoPicker);
@@ -2827,6 +3118,7 @@ function initRegistrarCliente() {
     resetFormAccordion(form);
     dataRetornoPicker.reset();
     clearModalAlert(form);
+    clearClienteEditState(form, modalTitle);
     submitBtn.disabled = false;
     submitBtn.textContent = 'Salvar cliente';
   }
@@ -2892,19 +3184,68 @@ function initRegistrarCliente() {
       return;
     }
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Enviando anexos...';
+    const editClienteId = form.dataset.editClienteId;
+    const isEdit = Boolean(editClienteId);
+    const submitLabel = isEdit ? 'Salvar alterações' : 'Salvar cliente';
 
+    submitBtn.disabled = true;
+    submitBtn.textContent = isEdit ? 'Atualizando anexos...' : 'Enviando anexos...';
+
+    const existingArquivos = isEdit ? form._editClienteOriginal?.arquivos : null;
     let arquivos;
     try {
-      arquivos = await collectArquivosAsync(form);
-      if (SOLARVITA_CONFIG.useDatabase) {
+      arquivos = await collectArquivosAsync(form, existingArquivos);
+      if (SOLARVITA_CONFIG.useDatabase && arquivos) {
         assertArquivosArmazenados(arquivos);
       }
     } catch (err) {
       showModalAlert(form, err.message || 'Não foi possível enviar os anexos. Tente novamente.');
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Salvar cliente';
+      submitBtn.textContent = submitLabel;
+      return;
+    }
+
+    if (isEdit) {
+      const payload = {
+        nome,
+        endereco,
+        whatsapp: whatsapp || '',
+        dataRetorno,
+        tipoRetorno,
+        tipoRetornoLabel: getTipoRetornoLabel(tipoRetorno, tipoRetornoOutros),
+        observacao,
+        dadosConsumo: collectDadosConsumo(form),
+        definicaoPerfil: collectDefinicaoPerfil(form)
+      };
+      if (arquivos) payload.arquivos = arquivos;
+
+      try {
+        if (SOLARVITA_CONFIG.useDatabase) {
+          const data = await SolarVitaAPI.updateVendedorCliente(editClienteId, payload);
+          const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(editClienteId));
+          if (idx >= 0) VENDEDOR_CLIENTES[idx] = data.cliente;
+        } else {
+          const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(editClienteId));
+          if (idx >= 0) {
+            VENDEDOR_CLIENTES[idx] = {
+              ...VENDEDOR_CLIENTES[idx],
+              ...payload
+            };
+            saveVendedorClientes();
+          }
+        }
+      } catch (error) {
+        showModalAlert(form, error.message || 'Não foi possível salvar as alterações.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = submitLabel;
+        return;
+      }
+
+      syncVisitasFromClientes();
+      refreshClientesUI();
+      refreshClientesBaseUI();
+      rebuildVendedorMapMarkers();
+      fecharModal();
       return;
     }
 
@@ -4052,8 +4393,10 @@ async function renderVendedorClientesPage(session) {
         <h1>Minha base de clientes</h1>
         <p>Olá, <strong>${getPrimeiroNome(session.nome)}</strong> — consulte e filtre todos os seus clientes cadastrados</p>
       </div>
-      <a href="/painel/admin" class="btn btn-primary">+ Registrar cliente</a>
+      <a href="/painel/admin" class="btn btn-primary" id="btn-registrar-cliente">+ Registrar cliente</a>
     </div>
+
+    ${buildRegistrarClienteModalHtml()}
 
     <div id="clientes-resumo-stats" class="clientes-resumo-grid"></div>
 
@@ -4098,6 +4441,7 @@ async function renderVendedorClientesPage(session) {
   `;
 
   refreshClientesBaseUI();
+  initRegistrarCliente();
   initClientesTrilhaHandlers(panel);
 
   document.getElementById('clientes-busca')?.addEventListener('input', refreshClientesBaseUI);

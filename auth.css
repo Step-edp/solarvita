@@ -1422,7 +1422,21 @@ body.auth-page {
   padding: 0.85rem 0.35rem 0.25rem 1.45rem;
 }
 
-.cliente-detalhe-section + .cliente-detalhe-section {
+.cliente-detalhe-section + .cliente-detalhe-wrap {
+  padding: 0.25rem 0 0.5rem;
+}
+
+.cliente-detalhe-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.85rem;
+}
+
+.btn-editar-cliente {
+  font-size: 0.82rem;
+}
+
+.cliente-detalhe-section {
   padding-top: 0.85rem;
   border-top: 1px solid rgba(0, 27, 77, 0.08);
 }

@@ -250,17 +250,11 @@ router.patch('/clientes/:id', async (req, res, next) => {
   try {
     const cpf = onlyDigits(req.user.cpf);
     const id = Number.parseInt(req.params.id, 10);
-    const { arquivos } = req.body || {};
+    const updates = req.body || {};
 
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: 'Registro inválido.' });
     }
-
-    if (!arquivos || typeof arquivos !== 'object') {
-      return res.status(400).json({ error: 'Anexos inválidos.' });
-    }
-
-    validateArquivosHaveUrls(arquivos);
 
     const existing = await query(
       `SELECT id, dados FROM vendedor_clientes
@@ -273,13 +267,50 @@ router.patch('/clientes/:id', async (req, res, next) => {
     }
 
     if (existing.rows[0].dados?.tipoRegistro === 'pap') {
-      return res.status(403).json({ error: 'Anexos de PAP não podem ser editados aqui.' });
+      return res.status(403).json({ error: 'Registro PAP não pode ser editado aqui.' });
     }
 
-    const dados = {
-      ...existing.rows[0].dados,
-      arquivos
-    };
+    const allowedFields = [
+      'nome',
+      'endereco',
+      'whatsapp',
+      'dataRetorno',
+      'tipoRetorno',
+      'tipoRetornoLabel',
+      'observacao',
+      'dadosConsumo',
+      'definicaoPerfil',
+      'arquivos'
+    ];
+
+    const dados = { ...existing.rows[0].dados };
+    let hasUpdates = false;
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        dados[field] = updates[field];
+        hasUpdates = true;
+      }
+    }
+
+    if (!hasUpdates) {
+      return res.status(400).json({ error: 'Nada para atualizar.' });
+    }
+
+    if (updates.nome != null && String(updates.nome).trim().length < 3) {
+      return res.status(400).json({ error: 'Informe o nome completo do cliente.' });
+    }
+
+    if (updates.endereco != null && String(updates.endereco).trim().length < 5) {
+      return res.status(400).json({ error: 'Informe o endereço completo.' });
+    }
+
+    if (updates.arquivos != null) {
+      if (typeof updates.arquivos !== 'object') {
+        return res.status(400).json({ error: 'Anexos inválidos.' });
+      }
+      validateArquivosHaveUrls(updates.arquivos);
+    }
 
     const updated = await query(
       `UPDATE vendedor_clientes
@@ -289,7 +320,9 @@ router.patch('/clientes/:id', async (req, res, next) => {
       [JSON.stringify(dados), id, cpf]
     );
 
-    await linkAnexosToCliente(query, id, arquivos, cpf);
+    if (updates.arquivos) {
+      await linkAnexosToCliente(query, id, updates.arquivos, cpf);
+    }
 
     res.json({ cliente: mapClienteRow(updated.rows[0]) });
   } catch (error) {
