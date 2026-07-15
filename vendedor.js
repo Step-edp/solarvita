@@ -2012,8 +2012,9 @@ const CLIENTE_TRILHA_ETAPAS = [
 ];
 
 let clientesFiltroEtapa = '';
+let expandedClienteRowId = '';
 
-function getClienteEtapaTrilha(cliente) {
+function getClienteRowId(cliente, index) {
   if (cliente?.etapaTrilha) return cliente.etapaTrilha;
   if (cliente?.status === 'apresentado') return 'apresentacao';
   if (cliente?.status === 'convertido') return 'acompanhamento';
