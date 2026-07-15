@@ -238,7 +238,9 @@ function switchAdminTab(tabId) {
   if (!adminPanel) return;
 
   adminPanel.querySelectorAll('[data-admin-tab]').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.adminTab === tabId);
+    const isActive = btn.dataset.adminTab === tabId;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
   adminPanel.querySelectorAll('[data-admin-panel]').forEach((panel) => {
     panel.hidden = panel.dataset.adminPanel !== tabId;
@@ -372,17 +374,34 @@ async function renderAdministradorDashboard(session) {
       <a href="/" class="btn btn-outline-light">Voltar ao site</a>
     </div>
 
-    <div class="admin-tabs">
-      <button type="button" class="admin-tab ${adminActiveTab === 'usuarios' ? 'active' : ''}" data-admin-tab="usuarios">
+    <div class="admin-segmented" role="tablist" aria-label="Seções do administrador">
+      <button
+        type="button"
+        class="admin-segment ${adminActiveTab === 'usuarios' ? 'active' : ''}"
+        data-admin-tab="usuarios"
+        role="tab"
+        aria-selected="${adminActiveTab === 'usuarios' ? 'true' : 'false'}"
+      >
         Usuários
-        <span class="admin-tab-badge admin-tab-badge-muted">${usuariosResumo.total}</span>
       </button>
-      <button type="button" class="admin-tab ${adminActiveTab === 'cadastros' ? 'active' : ''}" data-admin-tab="cadastros">
+      <button
+        type="button"
+        class="admin-segment ${adminActiveTab === 'cadastros' ? 'active' : ''}"
+        data-admin-tab="cadastros"
+        role="tab"
+        aria-selected="${adminActiveTab === 'cadastros' ? 'true' : 'false'}"
+      >
         Cadastros pendentes
-        ${pendentesList.length ? `<span class="admin-tab-badge">${pendentesList.length}</span>` : ''}
+        ${pendentesList.length ? `<span class="admin-segment-badge">${pendentesList.length}</span>` : ''}
       </button>
-      <button type="button" class="admin-tab ${adminActiveTab === 'atividades' ? 'active' : ''}" data-admin-tab="atividades">
-        Atividades adiadas
+      <button
+        type="button"
+        class="admin-segment ${adminActiveTab === 'atividades' ? 'active' : ''}"
+        data-admin-tab="atividades"
+        role="tab"
+        aria-selected="${adminActiveTab === 'atividades' ? 'true' : 'false'}"
+      >
+        Tarefas
       </button>
     </div>
 
@@ -537,8 +556,8 @@ async function renderAdministradorDashboard(session) {
       </div>
 
       <section class="vendedor-section admin-section">
-        <h2>Atividades adiadas por colaborador</h2>
-        <p class="section-desc">Quantidade de tarefas em atraso, vezes adiadas e tempo total de adiamento por membro da equipe.</p>
+        <h2>Tarefas da equipe</h2>
+        <p class="section-desc">Atividades adiadas por colaborador — quantidade, vezes adiadas e tempo total de atraso.</p>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead>
