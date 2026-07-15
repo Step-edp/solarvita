@@ -2014,11 +2014,15 @@ const CLIENTE_TRILHA_ETAPAS = [
 let clientesFiltroEtapa = '';
 let expandedClienteRowId = '';
 
-function getClienteRowId(cliente, index) {
+function getClienteEtapaTrilha(cliente) {
   if (cliente?.etapaTrilha) return cliente.etapaTrilha;
   if (cliente?.status === 'apresentado') return 'apresentacao';
   if (cliente?.status === 'convertido') return 'acompanhamento';
   return 'prospecao';
+}
+
+function getClienteRowId(cliente, index) {
+  return cliente.id != null ? String(cliente.id) : `row-${index}`;
 }
 
 function getTrilhaResumo(list) {
@@ -2051,13 +2055,6 @@ function renderClientesTrilhaHtml(list, activeEtapa = '') {
       </button>
     `;
   }).join('');
-}
-
-let clientesFiltroEtapa = '';
-let expandedClienteRowId = '';
-
-function getClienteRowId(cliente, index) {
-  return cliente.id != null ? String(cliente.id) : `row-${index}`;
 }
 
 function getEtapaTrilhaLabel(etapaId) {
