@@ -2507,14 +2507,21 @@ function getFileIcon(type = '') {
   return '📎';
 }
 
+function getAnexoOpenUrl(file) {
+  if (!anexoHasStoredFile(file)) return null;
+  return file?.url || null;
+}
+
 function renderAnexoItem(file, label = '', ctx = {}) {
   if (!file?.name) return '';
   const { clienteId, anexoPath } = ctx;
   const isImage = isImageFile(file);
-  const imageSrc = isImage ? getAnexoImageSrc(file) : null;
+  const openUrl = getAnexoOpenUrl(file);
+  const imageSrc = isImage ? (getAnexoImageSrc(file) || openUrl) : null;
   const missingFile = !anexoHasStoredFile(file);
   const canUpload = Boolean(clienteId && anexoPath && missingFile);
   const accept = getAnexoAcceptType(file);
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
   let previewHtml;
 
   if (imageSrc) {
@@ -2526,6 +2533,11 @@ function renderAnexoItem(file, label = '', ctx = {}) {
         <span class="cliente-anexo-missing-label">Foto indisponível</span>
         ${canUpload ? renderAnexoUploadButton(clienteId, anexoPath, accept) : ''}
       </div>`;
+  } else if (openUrl) {
+    previewHtml = `<a class="cliente-anexo-thumb cliente-anexo-file-link" href="${openUrl}" target="_blank" rel="noopener noreferrer" title="Abrir ${escapeHtml(file.name)}">
+        <span class="cliente-anexo-icon" aria-hidden="true">${getFileIcon(file.type || '')}</span>
+        <span class="cliente-anexo-open-label">${isPdf ? 'Abrir PDF' : 'Abrir arquivo'}</span>
+      </a>`;
   } else {
     previewHtml = `<div class="cliente-anexo-file-fallback">
         <span class="cliente-anexo-icon" aria-hidden="true">${getFileIcon(file.type || '')}</span>
@@ -2533,12 +2545,16 @@ function renderAnexoItem(file, label = '', ctx = {}) {
       </div>`;
   }
 
+  const nameHtml = openUrl
+    ? `<a class="cliente-anexo-name-link" href="${openUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(file.name)}</a>`
+    : `<span class="cliente-anexo-name">${escapeHtml(file.name)}</span>`;
+
   return `
-    <li class="cliente-anexo-item${imageSrc || isImage ? ' has-preview' : ''}${canUpload ? ' can-upload' : ''}">
+    <li class="cliente-anexo-item${imageSrc || isImage || openUrl ? ' has-preview' : ''}${canUpload ? ' can-upload' : ''}">
       ${previewHtml}
       <div class="cliente-anexo-info">
         ${label ? `<span class="cliente-anexo-label">${escapeHtml(label)}</span>` : ''}
-        <span class="cliente-anexo-name">${escapeHtml(file.name)}</span>
+        ${nameHtml}
         <span class="cliente-anexo-meta">${formatFileSize(file.size || 0)}${file.type ? ` · ${escapeHtml(file.type)}` : ''}</span>
       </div>
     </li>
@@ -2881,7 +2897,7 @@ function initClientesTrilhaHandlers(root = document) {
   root.dataset.trilhaBound = 'true';
 
   root.addEventListener('click', (event) => {
-    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .btn-editar-cliente, .cliente-prospectado-acoes, .btn-prospectado-acao')) {
+    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .cliente-anexo-thumb, .cliente-anexo-name-link, .btn-editar-cliente, .cliente-prospectado-acoes, .btn-prospectado-acao')) {
       event.stopPropagation();
     }
 

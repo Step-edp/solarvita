@@ -1039,7 +1039,7 @@ body.auth-page {
 
 .clientes-resumo-convertido { border-left-color: var(--color-green); }
 .clientes-resumo-apresentado { border-left-color: #003D8F; }
-.clientes-resumo-prospectado { border-left-color: #f59e0b; }
+.clientes-resumo-prospectado { border-left-color: #64748b; }
 .clientes-resumo-perdido { border-left-color: #dc2626; }
 
 .clientes-resumo-num {
@@ -1325,7 +1325,7 @@ body.auth-page {
 .stat-card.stat-apresentadas { border-left-color: #003D8F; }
 .stat-card.stat-convertidas { border-left-color: var(--color-green); }
 .stat-card.stat-perdidas { border-left-color: #dc2626; }
-.stat-card.stat-prospectados { border-left-color: #f59e0b; }
+.stat-card.stat-prospectados { border-left-color: #64748b; }
 
 .stat-label {
   font-size: 0.8rem;
@@ -1573,30 +1573,30 @@ body.auth-page {
 }
 
 .btn-inviavel {
-  color: #fff;
-  background: linear-gradient(180deg, #fbbf24 0%, #d97706 55%, #b45309 100%);
-  border-color: #b45309;
+  color: #991b1b;
+  background: linear-gradient(180deg, #ffffff 0%, #fee2e2 100%);
+  border-color: #dc2626;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.25) inset,
-    0 3px 0 #92400e,
-    0 4px 10px rgba(180, 83, 9, 0.28);
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 3px 0 #fecaca,
+    0 4px 10px rgba(220, 38, 38, 0.18);
 }
 
 .btn-inviavel:hover {
   color: #fff;
-  background: linear-gradient(180deg, #fcd34d 0%, #f59e0b 55%, #d97706 100%);
-  border-color: #92400e;
+  background: linear-gradient(180deg, #f87171 0%, #dc2626 55%, #b91c1c 100%);
+  border-color: #991b1b;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.3) inset,
-    0 4px 0 #92400e,
-    0 6px 14px rgba(217, 119, 6, 0.38);
+    0 4px 0 #991b1b,
+    0 6px 14px rgba(220, 38, 38, 0.38);
 }
 
 .btn-inviavel:active {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.15) inset,
-    0 1px 0 #92400e,
-    0 2px 6px rgba(217, 119, 6, 0.25);
+    0 1px 0 #991b1b,
+    0 2px 6px rgba(220, 38, 38, 0.25);
 }
 
 .cliente-foto-badge {
@@ -1666,6 +1666,38 @@ body.auth-page {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.cliente-anexo-file-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  text-decoration: none;
+  color: var(--color-navy);
+  transition: background 0.15s ease;
+}
+
+.cliente-anexo-file-link:hover {
+  background: #e8eef8;
+}
+
+.cliente-anexo-open-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0284c7;
+}
+
+.cliente-anexo-name-link {
+  font-weight: 700;
+  color: var(--color-navy);
+  text-decoration: none;
+}
+
+.cliente-anexo-name-link:hover {
+  color: #0284c7;
+  text-decoration: underline;
 }
 
 .cliente-anexo-thumb-missing {
@@ -1834,8 +1866,8 @@ body.auth-page {
 }
 
 .status-prospectado {
-  background: rgba(245, 158, 11, 0.15);
-  color: #b45309;
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
 }
 
 .pap-badge {
