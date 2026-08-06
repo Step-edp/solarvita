@@ -8,7 +8,8 @@ const {
   setAnexoAtPath,
   extractAnexoId,
   validateArquivosHaveUrls,
-  linkAnexosToCliente
+  linkAnexosToCliente,
+  pruneUnstoredAnexos
 } = require('../utils/anexos');
 
 const router = express.Router();
@@ -118,7 +119,8 @@ router.post('/clientes/:id/anexos', upload.single('file'), async (req, res, next
       stored: true
     };
 
-    const arquivos = setAnexoAtPath(existing.rows[0].dados?.arquivos, anexoPath, fileInfo);
+    const arquivosRaw = setAnexoAtPath(existing.rows[0].dados?.arquivos, anexoPath, fileInfo);
+    const arquivos = pruneUnstoredAnexos(arquivosRaw) || arquivosRaw;
     validateArquivosHaveUrls(arquivos);
 
     const dados = {

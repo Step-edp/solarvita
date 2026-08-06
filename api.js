@@ -2,6 +2,21 @@
  * Cliente HTTP da API Sol Amplo
  */
 const SolarVitaAPI = {
+  async fetchWithTimeout(url, options = {}, timeoutMs = 120000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Tempo esgotado ao enviar o arquivo. Tente novamente.');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
   async request(path, options = {}) {
     const response = await fetch(`/api${path}`, {
       method: options.method || 'GET',
@@ -82,7 +97,7 @@ const SolarVitaAPI = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch('/api/vendedor/anexos', {
+    const response = await this.fetchWithTimeout('/api/vendedor/anexos', {
       method: 'POST',
       credentials: 'include',
       body: formData
@@ -114,7 +129,7 @@ const SolarVitaAPI = {
     formData.append('file', file);
     formData.append('anexoPath', anexoPath);
 
-    const response = await fetch(`/api/vendedor/clientes/${clienteId}/anexos`, {
+    const response = await this.fetchWithTimeout(`/api/vendedor/clientes/${clienteId}/anexos`, {
       method: 'POST',
       credentials: 'include',
       body: formData

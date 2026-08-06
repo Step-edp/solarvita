@@ -1947,6 +1947,119 @@ function assertArquivosArmazenados(arquivos) {
   }
 }
 
+function pruneUnstoredAnexos(arquivos) {
+  if (!arquivos) return null;
+
+  const arq = normalizeArquivos(arquivos);
+  let hasStored = false;
+
+  if (Array.isArray(arq.contaLuz)) {
+    arq.contaLuz = arq.contaLuz.filter((entry) => {
+      if (entry?.url) {
+        hasStored = true;
+        return true;
+      }
+      return false;
+    });
+    if (!arq.contaLuz.length) delete arq.contaLuz;
+  }
+
+  if (arq.drone) {
+    const nextDrone = {};
+    Object.entries(arq.drone).forEach(([slotId, entry]) => {
+      if (entry?.url) {
+        hasStored = true;
+        nextDrone[slotId] = entry;
+      }
+    });
+    if (Object.keys(nextDrone).length) arq.drone = nextDrone;
+    else delete arq.drone;
+  }
+
+  if (Array.isArray(arq.extras)) {
+    arq.extras = arq.extras.filter((entry) => {
+      if (entry?.url) {
+        hasStored = true;
+        return true;
+      }
+      return false;
+    });
+    if (!arq.extras.length) delete arq.extras;
+  }
+
+  if (arq.video?.name) {
+    if (arq.video.url) hasStored = true;
+    else delete arq.video;
+  }
+
+  if (!hasStored) return null;
+
+  return arq;
+}
+
+function hasPendingFileUploads(form) {
+  for (const slot of DRONE_SLOTS) {
+    if (form.querySelector(`#drone-${slot.id}`)?.files?.[0]) return true;
+  }
+
+  if (form.querySelector('#file-video')?.files?.[0]) return true;
+
+  const extrasInput = form.querySelector('#file-extras');
+  const extrasZone = extrasInput?.closest('.upload-zone');
+  const extrasFiles = extrasZone?._files?.length
+    ? extrasZone._files
+    : Array.from(extrasInput?.files || []);
+  if (extrasFiles.length) return true;
+
+  for (const item of form.querySelectorAll('.conta-luz-item')) {
+    if (item.querySelector('.upload-input')?.files?.[0]) return true;
+  }
+
+  return false;
+}
+
+async function uploadEditArquivosAsync(form, clienteId, onProgress) {
+  let latestCliente = findClienteById(clienteId);
+  const tasks = [];
+
+  form.querySelectorAll('.conta-luz-item').forEach((item, index) => {
+    const file = item.querySelector('.upload-input')?.files?.[0];
+    if (file) tasks.push({ file, path: `contaLuz:${index}` });
+  });
+
+  for (const slot of DRONE_SLOTS) {
+    const file = form.querySelector(`#drone-${slot.id}`)?.files?.[0];
+    if (file) tasks.push({ file, path: `drone:${slot.id}` });
+  }
+
+  const extrasInput = form.querySelector('#file-extras');
+  const extrasZone = extrasInput?.closest('.upload-zone');
+  const extrasFiles = extrasZone?._files?.length
+    ? extrasZone._files
+    : Array.from(extrasInput?.files || []);
+  let extrasIndex = latestCliente?.arquivos?.extras?.length || 0;
+  extrasFiles.forEach((file) => {
+    tasks.push({ file, path: `extras:${extrasIndex}` });
+    extrasIndex += 1;
+  });
+
+  const videoFile = form.querySelector('#file-video')?.files?.[0];
+  if (videoFile) tasks.push({ file: videoFile, path: 'video:0' });
+
+  if (!tasks.length) return latestCliente;
+
+  for (let i = 0; i < tasks.length; i += 1) {
+    const task = tasks[i];
+    onProgress?.(`Enviando anexo ${i + 1}/${tasks.length}...`);
+    const data = await SolarVitaAPI.uploadClienteAnexo(clienteId, task.path, task.file);
+    latestCliente = data.cliente;
+    const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(clienteId));
+    if (idx >= 0) VENDEDOR_CLIENTES[idx] = data.cliente;
+  }
+
+  return latestCliente;
+}
+
 async function handleClienteAnexoUpload(input) {
   const clienteId = input.dataset.clienteId;
   const anexoPath = input.dataset.anexoPath;
@@ -1957,7 +2070,10 @@ async function handleClienteAnexoUpload(input) {
   if (!cliente) return;
 
   const uploadBtn = input.closest('.cliente-anexo-upload');
+  const uploadText = uploadBtn?.querySelector('.cliente-anexo-upload-text');
+  const previousText = uploadText?.textContent || '';
   if (uploadBtn) uploadBtn.classList.add('is-loading');
+  if (uploadText) uploadText.textContent = 'Enviando...';
 
   try {
     if (SOLARVITA_CONFIG.useDatabase) {
@@ -1987,6 +2103,7 @@ async function handleClienteAnexoUpload(input) {
     window.alert(err.message || 'Não foi possível enviar o arquivo.');
   } finally {
     if (uploadBtn) uploadBtn.classList.remove('is-loading');
+    if (uploadText) uploadText.textContent = previousText;
     input.value = '';
   }
 }
@@ -2018,7 +2135,7 @@ async function collectContasLuzAsync(form) {
 }
 
 async function collectArquivosAsync(form, existingArquivos = null) {
-  const existing = existingArquivos || {};
+  const existing = pruneUnstoredAnexos(existingArquivos) || {};
   const drone = { ...(existing.drone || {}) };
 
   for (const s of DRONE_SLOTS) {
@@ -2324,6 +2441,14 @@ function getEtapaTrilhaLabel(etapaId) {
   return CLIENTE_TRILHA_ETAPAS.find((etapa) => etapa.id === etapaId)?.label || '—';
 }
 
+function getProximaEtapaTrilha(etapaAtual) {
+  const idx = CLIENTE_TRILHA_ETAPAS.findIndex((etapa) => etapa.id === etapaAtual);
+  if (idx < 0 || idx >= CLIENTE_TRILHA_ETAPAS.length - 1) {
+    return etapaAtual || CLIENTE_TRILHA_ETAPAS[0].id;
+  }
+  return CLIENTE_TRILHA_ETAPAS[idx + 1].id;
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -2602,13 +2727,15 @@ function renderClienteDetalheHtml(cliente) {
 function renderProspectadoAcoesHtml(cliente) {
   if (cliente.status !== 'prospectado' || cliente.id == null) return '';
 
-  const possuiFotoActive = cliente.possuiFoto ? ' is-active' : '';
+  const possuiFotoBtn = cliente.possuiFoto
+    ? ''
+    : `<button type="button" class="btn-prospectado-acao btn-possui-foto" data-acao-prospectado="possui-foto" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Marcar que possui foto e avançar etapa">
+        Possui foto
+      </button>`;
 
   return `
     <div class="cliente-prospectado-acoes">
-      <button type="button" class="btn-prospectado-acao btn-possui-foto${possuiFotoActive}" data-acao-prospectado="possui-foto" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Marcar que possui foto">
-        Possui foto
-      </button>
+      ${possuiFotoBtn}
       <button type="button" class="btn-prospectado-acao btn-inviavel" data-acao-prospectado="inviavel" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Marcar como inviável">
         Inviável
       </button>
@@ -2623,7 +2750,11 @@ async function handleProspectadoAcao(clienteId, acao) {
   let payload;
   if (acao === 'possui-foto') {
     if (cliente.possuiFoto) return;
-    payload = { possuiFoto: true };
+    const etapaAtual = getClienteEtapaTrilha(cliente);
+    payload = {
+      possuiFoto: true,
+      etapaTrilha: getProximaEtapaTrilha(etapaAtual)
+    };
   } else if (acao === 'inviavel') {
     payload = { inviavel: true, status: 'perdido' };
   } else {
@@ -3257,37 +3388,30 @@ function initRegistrarCliente() {
     const submitLabel = isEdit ? 'Salvar alterações' : 'Salvar cliente';
 
     submitBtn.disabled = true;
-    submitBtn.textContent = isEdit ? 'Atualizando anexos...' : 'Enviando anexos...';
-
-    const existingArquivos = isEdit ? form._editClienteOriginal?.arquivos : null;
-    let arquivos;
-    try {
-      arquivos = await collectArquivosAsync(form, existingArquivos);
-      if (SOLARVITA_CONFIG.useDatabase && arquivos) {
-        assertArquivosArmazenados(arquivos);
-      }
-    } catch (err) {
-      showModalAlert(form, err.message || 'Não foi possível enviar os anexos. Tente novamente.');
-      submitBtn.disabled = false;
-      submitBtn.textContent = submitLabel;
-      return;
-    }
 
     if (isEdit) {
-      const payload = {
-        nome,
-        endereco,
-        whatsapp: whatsapp || '',
-        dataRetorno,
-        tipoRetorno,
-        tipoRetornoLabel: getTipoRetornoLabel(tipoRetorno, tipoRetornoOutros),
-        observacao,
-        dadosConsumo: collectDadosConsumo(form),
-        definicaoPerfil: collectDefinicaoPerfil(form)
-      };
-      if (arquivos) payload.arquivos = arquivos;
-
       try {
+        if (hasPendingFileUploads(form)) {
+          submitBtn.textContent = 'Atualizando anexos...';
+          await uploadEditArquivosAsync(form, editClienteId, (msg) => {
+            submitBtn.textContent = msg;
+          });
+        }
+
+        submitBtn.textContent = 'Salvando alterações...';
+
+        const payload = {
+          nome,
+          endereco,
+          whatsapp: whatsapp || '',
+          dataRetorno,
+          tipoRetorno,
+          tipoRetornoLabel: getTipoRetornoLabel(tipoRetorno, tipoRetornoOutros),
+          observacao,
+          dadosConsumo: collectDadosConsumo(form),
+          definicaoPerfil: collectDefinicaoPerfil(form)
+        };
+
         if (SOLARVITA_CONFIG.useDatabase) {
           const data = await SolarVitaAPI.updateVendedorCliente(editClienteId, payload);
           const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(editClienteId));
@@ -3314,6 +3438,21 @@ function initRegistrarCliente() {
       refreshClientesBaseUI();
       rebuildVendedorMapMarkers();
       fecharModal();
+      return;
+    }
+
+    submitBtn.textContent = 'Enviando anexos...';
+
+    let arquivos;
+    try {
+      arquivos = await collectArquivosAsync(form);
+      if (SOLARVITA_CONFIG.useDatabase && arquivos) {
+        assertArquivosArmazenados(arquivos);
+      }
+    } catch (err) {
+      showModalAlert(form, err.message || 'Não foi possível enviar os anexos. Tente novamente.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = submitLabel;
       return;
     }
 
