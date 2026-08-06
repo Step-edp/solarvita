@@ -507,9 +507,9 @@ function revokePreviewUrls() {
 }
 
 function renderPreviewCard(file, inputId, index = null) {
-  const isImage = file.type.startsWith('image/');
-  const isPdf = file.type === 'application/pdf';
-  const isVideo = file.type.startsWith('video/');
+  const isImage = isImageFile(file);
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+  const isVideo = (file.type || '').startsWith('video/');
   let media = '<span class="preview-file-icon">📎</span>';
   if (isImage) {
     const url = URL.createObjectURL(file);
@@ -1839,6 +1839,8 @@ function guessMimeFromName(name = '') {
   if (/\.png$/.test(lower)) return 'image/png';
   if (/\.webp$/.test(lower)) return 'image/webp';
   if (/\.gif$/.test(lower)) return 'image/gif';
+  if (/\.heic$/.test(lower)) return 'image/heic';
+  if (/\.heif$/.test(lower)) return 'image/heif';
   if (/\.pdf$/.test(lower)) return 'application/pdf';
   if (/\.mp4$/.test(lower)) return 'video/mp4';
   return '';
@@ -2144,13 +2146,20 @@ async function collectContasLuzAsync(form) {
       existing = null;
     }
 
-    if (nomeConta || file || existing) {
-      const fileInfo = file ? await buildFileInfo(file) : {};
-      contas.push({
-        ...(existing || {}),
-        ...fileInfo,
-        nomeConta: nomeConta || existing?.nomeConta || ''
-      });
+    if (nomeConta || file || (existing?.url || existing?.preview)) {
+      if (file) {
+        const fileInfo = await buildFileInfo(file);
+        contas.push({
+          ...(existing?.url || existing?.preview ? existing : {}),
+          ...fileInfo,
+          nomeConta: nomeConta || existing?.nomeConta || ''
+        });
+      } else if (existing?.url || existing?.preview) {
+        contas.push({
+          ...existing,
+          nomeConta: nomeConta || existing?.nomeConta || ''
+        });
+      }
     }
   }
   return contas;
@@ -3464,6 +3473,7 @@ function initRegistrarCliente() {
           }
         }
       } catch (error) {
+        expandAccordionPanel(form, 'registros-fotograficos');
         showModalAlert(form, error.message || 'Não foi possível salvar as alterações.');
         submitBtn.disabled = false;
         submitBtn.textContent = submitLabel;
@@ -3475,21 +3485,6 @@ function initRegistrarCliente() {
       refreshClientesBaseUI();
       rebuildVendedorMapMarkers();
       fecharModal();
-      return;
-    }
-
-    submitBtn.textContent = 'Enviando anexos...';
-
-    let arquivos;
-    try {
-      arquivos = await collectArquivosAsync(form);
-      if (SOLARVITA_CONFIG.useDatabase && arquivos) {
-        assertArquivosArmazenados(arquivos);
-      }
-    } catch (err) {
-      showModalAlert(form, err.message || 'Não foi possível enviar os anexos. Tente novamente.');
-      submitBtn.disabled = false;
-      submitBtn.textContent = submitLabel;
       return;
     }
 
@@ -3515,7 +3510,6 @@ function initRegistrarCliente() {
       observacao,
       dadosConsumo: collectDadosConsumo(form),
       definicaoPerfil: collectDefinicaoPerfil(form),
-      arquivos,
       status: 'prospectado',
       etapaTrilha: 'prospecao',
       data: formatDataHoje(),
@@ -3529,13 +3523,35 @@ function initRegistrarCliente() {
       try {
         const data = await SolarVitaAPI.createVendedorCliente(cliente);
         VENDEDOR_CLIENTES.unshift(data.cliente);
+
+        if (hasPendingFileUploads(form)) {
+          submitBtn.textContent = 'Enviando anexos...';
+          await uploadEditArquivosAsync(form, data.cliente.id, (msg) => {
+            submitBtn.textContent = msg;
+          });
+        }
       } catch (error) {
+        expandAccordionPanel(form, 'registros-fotograficos');
         showModalAlert(form, error.message || 'Não foi possível salvar o cliente.');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Salvar cliente';
         return;
       }
     } else {
+      submitBtn.textContent = 'Enviando anexos...';
+
+      let arquivos;
+      try {
+        arquivos = await collectArquivosAsync(form);
+      } catch (err) {
+        expandAccordionPanel(form, 'registros-fotograficos');
+        showModalAlert(form, err.message || 'Não foi possível enviar os anexos. Tente novamente.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = submitLabel;
+        return;
+      }
+
+      if (arquivos) cliente.arquivos = arquivos;
       VENDEDOR_CLIENTES.unshift(cliente);
       saveVendedorClientes();
     }

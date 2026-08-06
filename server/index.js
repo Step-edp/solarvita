@@ -5,6 +5,7 @@ const { migrate } = require('./migrate');
 const { seedAdmin } = require('./seed');
 
 const { MAX_FILE_SIZE_LABEL } = require('./uploads');
+const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const vendedorRoutes = require('./routes/vendedor');
 
