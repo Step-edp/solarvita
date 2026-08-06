@@ -11,6 +11,7 @@ const {
   linkAnexosToCliente,
   pruneUnstoredAnexos
 } = require('../utils/anexos');
+const { buildPropostaPdf } = require('../utils/propostaPdf');
 
 const router = express.Router();
 
@@ -352,6 +353,36 @@ router.patch('/clientes/:id', async (req, res, next) => {
     }
 
     res.json({ cliente: mapClienteRow(updated.rows[0]) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/clientes/:id/proposta.pdf', async (req, res, next) => {
+  try {
+    const cpf = onlyDigits(req.user.cpf);
+    const id = Number.parseInt(req.params.id, 10);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Registro inválido.' });
+    }
+
+    const existing = await query(
+      `SELECT id, dados FROM vendedor_clientes
+       WHERE id = $1 AND vendedor_cpf = $2`,
+      [id, cpf]
+    );
+
+    if (!existing.rows.length) {
+      return res.status(404).json({ error: 'Registro não encontrado.' });
+    }
+
+    const cliente = mapClienteRow(existing.rows[0]);
+    const { bytes, filename } = await buildPropostaPdf(cliente, {}, req.user);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.send(Buffer.from(bytes));
   } catch (error) {
     next(error);
   }

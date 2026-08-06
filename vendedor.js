@@ -2774,6 +2774,34 @@ function renderClienteDefinicaoPerfilHtml(perfil) {
   return renderDetalheSection('Definição de perfil', fields);
 }
 
+async function downloadPropostaPdf(clienteId) {
+  const response = await fetch(`/api/vendedor/clientes/${clienteId}/proposta.pdf`, {
+    credentials: 'include'
+  });
+
+  if (!response.ok) {
+    let message = 'Não foi possível gerar a proposta.';
+    try {
+      const data = await response.json();
+      message = data.message || data.error || message;
+    } catch {
+      // resposta não JSON
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename=\"?([^\";]+)/i);
+  const filename = match ? decodeURIComponent(match[1]) : 'Proposta.pdf';
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function renderClienteDetalheHtml(cliente) {
   const registro = cliente.carimbo || cliente.data || '—';
   const loc = cliente.lat != null && cliente.lng != null
@@ -2799,6 +2827,15 @@ function renderClienteDetalheHtml(cliente) {
   return `
     <div class="cliente-detalhe-wrap">
       <div class="cliente-detalhe-actions">
+        <button type="button" class="btn-gerar-proposta" data-gerar-proposta="${escapeHtml(String(cliente.id))}" aria-label="Gerar proposta comercial em PDF" title="Gerar proposta PDF">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+          <span>Proposta PDF</span>
+        </button>
         <button type="button" class="btn-editar-cliente" data-edit-cliente="${escapeHtml(String(cliente.id))}" aria-label="Editar informações do cliente" title="Editar informações">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M12 20h9"/>
@@ -2974,13 +3011,27 @@ function initClientesTrilhaHandlers(root = document) {
   root.dataset.trilhaBound = 'true';
 
   root.addEventListener('click', (event) => {
-    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .cliente-anexo-thumb, .cliente-anexo-name-link, .btn-editar-cliente, .cliente-prospectado-acoes, .btn-prospectado-acao')) {
+    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .cliente-anexo-thumb, .cliente-anexo-name-link, .btn-editar-cliente, .btn-gerar-proposta, .cliente-prospectado-acoes, .btn-prospectado-acao')) {
       event.stopPropagation();
     }
 
     const acaoBtn = event.target.closest('[data-acao-prospectado]');
     if (acaoBtn && root.contains(acaoBtn)) {
       handleProspectadoAcao(acaoBtn.dataset.clienteId, acaoBtn.dataset.acaoProspectado);
+      return;
+    }
+
+    const propostaBtn = event.target.closest('[data-gerar-proposta]');
+    if (propostaBtn && root.contains(propostaBtn)) {
+      const clienteId = propostaBtn.dataset.gerarProposta;
+      propostaBtn.disabled = true;
+      propostaBtn.classList.add('is-loading');
+      downloadPropostaPdf(clienteId)
+        .catch((error) => window.alert(error.message || 'Erro ao gerar proposta.'))
+        .finally(() => {
+          propostaBtn.disabled = false;
+          propostaBtn.classList.remove('is-loading');
+        });
       return;
     }
 
