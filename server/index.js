@@ -70,8 +70,18 @@ function createApp() {
       });
     }
 
+    if (err?.code === 'anexos_nao_armazenados') {
+      return res.status(400).json({
+        error: err.code,
+        message: err.message
+      });
+    }
+
     console.error(err);
-    res.status(500).json({ error: 'Erro interno do servidor.' });
+    res.status(500).json({
+      error: 'Erro interno do servidor.',
+      message: err?.message || 'Erro interno do servidor.'
+    });
   });
 
   return app;

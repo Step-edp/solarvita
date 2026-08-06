@@ -1774,7 +1774,7 @@ function getFileInfo(input) {
 
 function createImagePreview(file, maxWidth = 320, quality = 0.72) {
   return new Promise((resolve) => {
-    if (!file?.type?.startsWith('image/')) {
+    if (!isImageFile(file)) {
       resolve(null);
       return;
     }
@@ -1800,19 +1800,62 @@ function createImagePreview(file, maxWidth = 320, quality = 0.72) {
   });
 }
 
+function compressImageFileForUpload(file, maxWidth = 2560, quality = 0.82) {
+  return new Promise((resolve) => {
+    if (!isImageFile(file)) {
+      resolve(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const name = file.name.replace(/\.(heic|heif|png|webp|jpeg|jpg)$/i, '.jpg');
+          resolve(new File([blob], name, { type: 'image/jpeg' }));
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = () => resolve(file);
+      img.src = reader.result;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function prepareFileForUpload(file) {
+  assertUploadSizeAllowed(file);
+  if (!isImageFile(file) || file.size <= 1.5 * 1024 * 1024) {
+    return file;
+  }
+  return compressImageFileForUpload(file);
+}
+
 async function buildFileInfo(file) {
   if (!file) return null;
 
-  assertUploadSizeAllowed(file);
+  const prepared = await prepareFileForUpload(file);
 
   const info = {
-    name: file.name,
-    type: file.type || guessMimeFromName(file.name),
-    size: file.size
+    name: prepared.name,
+    type: prepared.type || guessMimeFromName(prepared.name),
+    size: prepared.size
   };
 
   if (SOLARVITA_CONFIG.useDatabase) {
-    const uploaded = await SolarVitaAPI.uploadAnexo(file);
+    const uploaded = await SolarVitaAPI.uploadAnexo(prepared);
     if (!uploaded?.url) {
       throw new Error(`Não foi possível armazenar "${file.name}". Tente novamente.`);
     }
@@ -1827,7 +1870,7 @@ async function buildFileInfo(file) {
   }
 
   if (isImageFile(info)) {
-    info.preview = await createImagePreview(file);
+    info.preview = await createImagePreview(prepared);
   }
 
   return info;
@@ -2067,7 +2110,8 @@ async function uploadEditArquivosAsync(form, clienteId, onProgress) {
   for (let i = 0; i < tasks.length; i += 1) {
     const task = tasks[i];
     onProgress?.(`Enviando anexo ${i + 1}/${tasks.length}...`);
-    const data = await SolarVitaAPI.uploadClienteAnexo(clienteId, task.path, task.file);
+    const prepared = await prepareFileForUpload(task.file);
+    const data = await SolarVitaAPI.uploadClienteAnexo(clienteId, task.path, prepared);
     latestCliente = data.cliente;
     const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(clienteId));
     if (idx >= 0) VENDEDOR_CLIENTES[idx] = data.cliente;
@@ -2100,8 +2144,10 @@ async function handleClienteAnexoUpload(input) {
   if (uploadText) uploadText.textContent = 'Enviando...';
 
   try {
+    const prepared = await prepareFileForUpload(file);
+
     if (SOLARVITA_CONFIG.useDatabase) {
-      const data = await SolarVitaAPI.uploadClienteAnexo(clienteId, anexoPath, file);
+      const data = await SolarVitaAPI.uploadClienteAnexo(clienteId, anexoPath, prepared);
       const saved = getAnexoAtPath(data.cliente?.arquivos, anexoPath);
       if (!saved?.url) {
         throw new Error('Arquivo enviado, mas não foi salvo no cadastro do cliente.');

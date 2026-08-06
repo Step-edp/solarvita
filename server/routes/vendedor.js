@@ -57,7 +57,8 @@ router.post('/anexos', upload.single('file'), async (req, res, next) => {
 });
 
 router.post('/clientes/:id/anexos', upload.single('file'), async (req, res, next) => {
-  const client = await pool.connect();
+  let client;
+  let transactionStarted = false;
 
   try {
     if (!req.file) {
@@ -80,7 +81,9 @@ router.post('/clientes/:id/anexos', upload.single('file'), async (req, res, next
       return res.status(400).json({ error: 'Referência do anexo é obrigatória.' });
     }
 
+    client = await pool.connect();
     await client.query('BEGIN');
+    transactionStarted = true;
 
     const existing = await client.query(
       `SELECT id, dados FROM vendedor_clientes
@@ -91,11 +94,13 @@ router.post('/clientes/:id/anexos', upload.single('file'), async (req, res, next
 
     if (!existing.rows.length) {
       await client.query('ROLLBACK');
+      transactionStarted = false;
       return res.status(404).json({ error: 'Registro não encontrado.' });
     }
 
     if (existing.rows[0].dados?.tipoRegistro === 'pap') {
       await client.query('ROLLBACK');
+      transactionStarted = false;
       return res.status(403).json({ error: 'Anexos de PAP não podem ser editados aqui.' });
     }
 
@@ -121,7 +126,15 @@ router.post('/clientes/:id/anexos', upload.single('file'), async (req, res, next
 
     const arquivosRaw = setAnexoAtPath(existing.rows[0].dados?.arquivos, anexoPath, fileInfo);
     const arquivos = pruneUnstoredAnexos(arquivosRaw) || arquivosRaw;
-    validateArquivosHaveUrls(arquivos);
+
+    if (!getAnexoAtPath(arquivos, anexoPath)?.url) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
+      return res.status(500).json({
+        error: 'upload_failed',
+        message: 'Não foi possível vincular o arquivo ao cliente.'
+      });
+    }
 
     const dados = {
       ...existing.rows[0].dados,
@@ -144,6 +157,7 @@ router.post('/clientes/:id/anexos', upload.single('file'), async (req, res, next
     }
 
     await client.query('COMMIT');
+    transactionStarted = false;
 
     res.status(201).json({
       cliente: mapClienteRow(updated.rows[0]),
@@ -151,10 +165,17 @@ router.post('/clientes/:id/anexos', upload.single('file'), async (req, res, next
       stored: true
     });
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (client && transactionStarted) {
+      await client.query('ROLLBACK').catch(() => {});
+    }
+
+    if (error?.code === 'anexos_nao_armazenados') {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
+
     next(error);
   } finally {
-    client.release();
+    if (client) client.release();
   }
 });
 
