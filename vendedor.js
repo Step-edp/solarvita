@@ -398,6 +398,7 @@ async function reverseGeocodeEndereco(lat, lng) {
 
 let vendedorMap = null;
 let previewUrls = [];
+const zonePreviewUrls = new WeakMap();
 
 const DRONE_SLOTS = [
   { id: 'cima', label: 'Cima' },
@@ -502,18 +503,34 @@ function assertUploadSizeAllowed(file) {
 }
 
 function revokePreviewUrls() {
-  previewUrls.forEach(url => URL.revokeObjectURL(url));
+  previewUrls.forEach((url) => URL.revokeObjectURL(url));
   previewUrls = [];
 }
 
-function renderPreviewCard(file, inputId, index = null) {
+function revokeZonePreviewUrls(zone) {
+  if (!zone) return;
+  const urls = zonePreviewUrls.get(zone) || [];
+  urls.forEach((url) => URL.revokeObjectURL(url));
+  zonePreviewUrls.delete(zone);
+}
+
+function trackZonePreviewUrl(zone, url) {
+  if (!zone || !url) return;
+  const urls = zonePreviewUrls.get(zone) || [];
+  urls.push(url);
+  zonePreviewUrls.set(zone, urls);
+  previewUrls.push(url);
+}
+
+function renderPreviewCard(file, inputId, index = null, zone = null) {
   const isImage = isImageFile(file);
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
   const isVideo = (file.type || '').startsWith('video/');
   let media = '<span class="preview-file-icon">📎</span>';
   if (isImage) {
     const url = URL.createObjectURL(file);
-    previewUrls.push(url);
+    if (zone) trackZonePreviewUrl(zone, url);
+    else previewUrls.push(url);
     media = `<img src="${url}" alt="" class="preview-img">`;
   } else if (isPdf) {
     media = '<span class="preview-file-icon pdf">PDF</span>';
@@ -528,9 +545,46 @@ function renderPreviewCard(file, inputId, index = null) {
         <span class="preview-name">${file.name}</span>
         <span class="preview-size">${formatFileSize(file.size)}</span>
       </div>
+      <button type="button" class="preview-replace" data-input="${inputId}"${idxAttr}>Trocar</button>
       <button type="button" class="preview-remove" data-input="${inputId}"${idxAttr} aria-label="Remover">×</button>
     </div>
   `;
+}
+
+function renderExistingPreviewCard(file, inputId, src) {
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+  const isVideo = (file.type || '').startsWith('video/');
+  let media = '<span class="preview-file-icon">📎</span>';
+  if (src && isImageFile(file)) {
+    media = `<img src="${src}" alt="" class="preview-img">`;
+  } else if (isPdf) {
+    media = '<span class="preview-file-icon pdf">PDF</span>';
+  } else if (isVideo) {
+    media = '<span class="preview-file-icon video">▶</span>';
+  }
+
+  return `
+    <div class="preview-card preview-card-existing">
+      ${media}
+      <div class="preview-meta">
+        <span class="preview-name">${escapeHtml(file.name || 'Arquivo salvo')}</span>
+        <span class="preview-size">${formatFileSize(file.size || 0)}</span>
+      </div>
+      <button type="button" class="preview-replace" data-input="${inputId}">Trocar</button>
+    </div>
+  `;
+}
+
+function showExistingAnexoPreview(zone, file) {
+  const input = zone.querySelector('.upload-input');
+  const preview = zone.querySelector('.upload-preview');
+  if (!input || !preview || !file) return;
+
+  revokeZonePreviewUrls(zone);
+  zone.classList.add('has-file');
+  zone.dataset.existingAnexo = 'true';
+  zone.dataset.existingAnexoData = JSON.stringify(file);
+  preview.innerHTML = renderExistingPreviewCard(file, input.id, getAnexoImageSrc(file) || getAnexoOpenUrl(file));
 }
 
 function refreshUploadZone(input) {
@@ -538,18 +592,35 @@ function refreshUploadZone(input) {
   if (!zone) return;
   const preview = zone.querySelector('.upload-preview');
 
-  revokePreviewUrls();
+  revokeZonePreviewUrls(zone);
 
   if (input.multiple) {
     const files = zone._files || [];
     zone.classList.toggle('has-file', files.length > 0);
-    preview.innerHTML = files.map((f, i) => renderPreviewCard(f, input.id, i)).join('');
+    preview.innerHTML = files.map((f, i) => renderPreviewCard(f, input.id, i, zone)).join('');
     return;
   }
 
   const file = input.files[0];
   zone.classList.toggle('has-file', !!file);
-  preview.innerHTML = file ? renderPreviewCard(file, input.id) : '';
+  if (file) {
+    delete zone.dataset.existingAnexo;
+    delete zone.dataset.existingAnexoData;
+    preview.innerHTML = renderPreviewCard(file, input.id, null, zone);
+  } else if (zone.dataset.existingAnexo === 'true') {
+    try {
+      const existing = JSON.parse(zone.dataset.existingAnexoData || 'null');
+      if (existing) {
+        preview.innerHTML = renderExistingPreviewCard(existing, input.id, getAnexoImageSrc(existing) || getAnexoOpenUrl(existing));
+        zone.classList.add('has-file');
+        return;
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  preview.innerHTML = '';
 }
 
 function syncInputFiles(input, files) {
@@ -604,6 +675,13 @@ function setupFileUploads(form) {
   form.querySelectorAll('.upload-zone').forEach(setupUploadZone);
 
   form.addEventListener('click', (e) => {
+    const replaceBtn = e.target.closest('.preview-replace');
+    if (replaceBtn) {
+      const input = form.querySelector(`#${replaceBtn.dataset.input}`);
+      input?.click();
+      return;
+    }
+
     const btn = e.target.closest('.preview-remove');
     if (!btn) return;
     const input = form.querySelector(`#${btn.dataset.input}`);
@@ -615,21 +693,29 @@ function setupFileUploads(form) {
       syncInputFiles(input, zone._files);
     } else {
       input.value = '';
-      if (zone) zone._files = [];
+      if (zone) {
+        zone._files = [];
+        delete zone.dataset.existingAnexo;
+        delete zone.dataset.existingAnexoData;
+      }
     }
-    revokePreviewUrls();
     refreshUploadZone(input);
   });
 }
 
 function resetFilePreviews(form) {
-  revokePreviewUrls();
   form.querySelectorAll('.upload-zone').forEach((zone) => {
+    revokeZonePreviewUrls(zone);
     zone.classList.remove('has-file', 'dragover');
     zone._files = [];
+    delete zone.dataset.existingAnexo;
+    delete zone.dataset.existingAnexoData;
     const preview = zone.querySelector('.upload-preview');
     if (preview) preview.innerHTML = '';
+    const input = zone.querySelector('.upload-input');
+    if (input) input.value = '';
   });
+  previewUrls = [];
 }
 
 function renderUploadZone({ id, label, accept, multiple = false, icon, hint, large = false }) {
@@ -2137,7 +2223,7 @@ async function handleClienteAnexoUpload(input) {
   const cliente = VENDEDOR_CLIENTES.find((item) => String(item.id) === String(clienteId));
   if (!cliente) return;
 
-  const uploadBtn = input.closest('.cliente-anexo-upload');
+  const uploadBtn = input.closest('.cliente-anexo-upload, .btn-anexar-conta');
   const uploadText = uploadBtn?.querySelector('.cliente-anexo-upload-text');
   const previousText = uploadText?.textContent || '';
   if (uploadBtn) uploadBtn.classList.add('is-loading');
@@ -2155,6 +2241,14 @@ async function handleClienteAnexoUpload(input) {
 
       const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(clienteId));
       if (idx >= 0) VENDEDOR_CLIENTES[idx] = data.cliente;
+
+      if (anexoPath.startsWith('contaLuz:') && getClienteEtapaTrilha(data.cliente) === 'drone') {
+        const proximaEtapa = getProximaEtapaTrilha('drone');
+        if (proximaEtapa !== 'drone') {
+          const updated = await SolarVitaAPI.updateVendedorCliente(clienteId, { etapaTrilha: proximaEtapa });
+          if (idx >= 0) VENDEDOR_CLIENTES[idx] = updated.cliente;
+        }
+      }
     } else {
       const uploaded = await buildFileInfo(file);
       const current = getAnexoAtPath(cliente.arquivos, anexoPath) || {};
@@ -2169,6 +2263,8 @@ async function handleClienteAnexoUpload(input) {
     }
 
     refreshClientesBaseUI();
+    syncVisitasFromClientes();
+    rebuildVendedorMapMarkers();
   } catch (err) {
     window.alert(err.message || 'Não foi possível enviar o arquivo.');
   } finally {
@@ -2596,7 +2692,8 @@ function renderAnexoItem(file, label = '', ctx = {}) {
   const openUrl = getAnexoOpenUrl(file);
   const imageSrc = isImage ? (getAnexoImageSrc(file) || openUrl) : null;
   const missingFile = !anexoHasStoredFile(file);
-  const canUpload = Boolean(clienteId && anexoPath && missingFile);
+  const canUpload = Boolean(clienteId && anexoPath);
+  const uploadLabel = missingFile ? 'Enviar arquivo' : 'Trocar foto';
   const accept = getAnexoAcceptType(file);
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
   let previewHtml;
@@ -2605,20 +2702,26 @@ function renderAnexoItem(file, label = '', ctx = {}) {
     previewHtml = `<a class="cliente-anexo-thumb" href="${imageSrc}" target="_blank" rel="noopener noreferrer" title="Abrir ${escapeHtml(file.name)}">
         <img src="${imageSrc}" alt="${escapeHtml(file.name)}" loading="lazy">
       </a>`;
+    if (canUpload) {
+      previewHtml += renderAnexoUploadButton(clienteId, anexoPath, accept, uploadLabel);
+    }
   } else if (isImage) {
     previewHtml = `<div class="cliente-anexo-thumb cliente-anexo-thumb-missing">
         <span class="cliente-anexo-missing-label">Foto indisponível</span>
-        ${canUpload ? renderAnexoUploadButton(clienteId, anexoPath, accept) : ''}
+        ${canUpload ? renderAnexoUploadButton(clienteId, anexoPath, accept, uploadLabel) : ''}
       </div>`;
   } else if (openUrl) {
     previewHtml = `<a class="cliente-anexo-thumb cliente-anexo-file-link" href="${openUrl}" target="_blank" rel="noopener noreferrer" title="Abrir ${escapeHtml(file.name)}">
         <span class="cliente-anexo-icon" aria-hidden="true">${getFileIcon(file.type || '')}</span>
         <span class="cliente-anexo-open-label">${isPdf ? 'Abrir PDF' : 'Abrir arquivo'}</span>
       </a>`;
+    if (canUpload) {
+      previewHtml += renderAnexoUploadButton(clienteId, anexoPath, accept, uploadLabel);
+    }
   } else {
     previewHtml = `<div class="cliente-anexo-file-fallback">
         <span class="cliente-anexo-icon" aria-hidden="true">${getFileIcon(file.type || '')}</span>
-        ${canUpload ? renderAnexoUploadButton(clienteId, anexoPath, accept) : ''}
+        ${canUpload ? renderAnexoUploadButton(clienteId, anexoPath, accept, uploadLabel) : ''}
       </div>`;
   }
 
@@ -2628,7 +2731,9 @@ function renderAnexoItem(file, label = '', ctx = {}) {
 
   return `
     <li class="cliente-anexo-item${imageSrc || isImage || openUrl ? ' has-preview' : ''}${canUpload ? ' can-upload' : ''}">
-      ${previewHtml}
+      <div class="cliente-anexo-media">
+        ${previewHtml}
+      </div>
       <div class="cliente-anexo-info">
         ${label ? `<span class="cliente-anexo-label">${escapeHtml(label)}</span>` : ''}
         ${nameHtml}
@@ -2638,13 +2743,29 @@ function renderAnexoItem(file, label = '', ctx = {}) {
   `;
 }
 
-function renderAnexoUploadButton(clienteId, anexoPath, accept) {
+function renderAnexoUploadButton(clienteId, anexoPath, accept, label = 'Enviar arquivo') {
   return `
     <label class="cliente-anexo-upload">
       <input type="file" class="cliente-anexo-input" accept="${accept}" hidden
         data-cliente-id="${escapeHtml(String(clienteId))}" data-anexo-path="${escapeHtml(anexoPath)}">
-      <span class="cliente-anexo-upload-text">Enviar arquivo</span>
+      <span class="cliente-anexo-upload-text">${escapeHtml(label)}</span>
     </label>
+  `;
+}
+
+function renderEmptyAnexoSlot(clienteId, anexoPath, label, accept = 'image/*') {
+  if (!clienteId || !anexoPath) return '';
+  return `
+    <li class="cliente-anexo-item can-upload cliente-anexo-item-empty">
+      <div class="cliente-anexo-thumb cliente-anexo-thumb-empty">
+        <span class="cliente-anexo-icon" aria-hidden="true">📷</span>
+        ${renderAnexoUploadButton(clienteId, anexoPath, accept, 'Enviar foto')}
+      </div>
+      <div class="cliente-anexo-info">
+        <span class="cliente-anexo-label">${escapeHtml(label)}</span>
+        <span class="cliente-anexo-meta">Nenhuma foto enviada</span>
+      </div>
+    </li>
   `;
 }
 
@@ -2669,11 +2790,24 @@ function renderClienteAnexosHtml(arquivos, clienteId = '') {
 
   Object.entries(arquivos.drone || {}).forEach(([slotId, drone]) => {
     if (!drone?.name) return;
-    items.push(renderAnexoItem(drone, `Conta de Luz — ${drone.label || 'Foto'}`, {
+    items.push(renderAnexoItem(drone, `Conta de Luz — ${drone.label || slotId}`, {
       clienteId,
       anexoPath: `drone:${slotId}`
     }));
   });
+
+  if (clienteId) {
+    DRONE_SLOTS.forEach((slot) => {
+      const existing = arquivos.drone?.[slot.id];
+      if (existing?.name) return;
+      items.push(renderEmptyAnexoSlot(
+        clienteId,
+        `drone:${slot.id}`,
+        `Conta de Luz — ${slot.label}`,
+        'image/*'
+      ));
+    });
+  }
 
   (arquivos.extras || []).forEach((extra, index) => {
     if (!extra?.name) return;
@@ -2691,6 +2825,14 @@ function renderClienteAnexosHtml(arquivos, clienteId = '') {
   }
 
   if (!items.length) {
+    if (clienteId) {
+      return `<ul class="cliente-anexos-list">${DRONE_SLOTS.map((slot) => renderEmptyAnexoSlot(
+        clienteId,
+        `drone:${slot.id}`,
+        `Conta de Luz — ${slot.label}`,
+        'image/*'
+      )).join('')}</ul>`;
+    }
     return '<p class="cliente-detalhe-empty">Nenhum anexo.</p>';
   }
 
@@ -2854,9 +2996,16 @@ function renderClienteDetalheHtml(cliente) {
   `;
 }
 
-function renderProspectadoAcoesHtml(cliente) {
-  if (cliente.status !== 'prospectado' || cliente.id == null) return '';
+function getNextContaLuzAnexoPath(arquivos) {
+  const contas = Array.isArray(arquivos?.contaLuz)
+    ? arquivos.contaLuz
+    : (arquivos?.contaLuz ? [arquivos.contaLuz] : []);
+  const missingIdx = contas.findIndex((conta) => !anexoHasStoredFile(conta));
+  const index = missingIdx >= 0 ? missingIdx : contas.length;
+  return `contaLuz:${index}`;
+}
 
+function renderPreCadastroAcoesHtml(cliente) {
   const possuiFotoActive = cliente.possuiFoto ? ' is-active' : '';
 
   return `
@@ -2869,6 +3018,43 @@ function renderProspectadoAcoesHtml(cliente) {
       </button>
     </div>
   `;
+}
+
+function renderContaLuzAcoesHtml(cliente) {
+  const anexoPath = getNextContaLuzAnexoPath(cliente.arquivos);
+
+  return `
+    <div class="cliente-prospectado-acoes">
+      <button type="button" class="btn-prospectado-acao btn-inviavel" data-acao-prospectado="inviavel" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Inviável para anexar conta de luz">
+        Inviável
+      </button>
+      <label class="btn-prospectado-acao btn-anexar-conta" title="Anexar PDF ou foto da conta de luz">
+        <input type="file" class="cliente-anexo-input" accept=".pdf,image/*" hidden
+          data-cliente-id="${escapeHtml(String(cliente.id))}" data-anexo-path="${escapeHtml(anexoPath)}">
+        Anexar conta
+      </label>
+      <button type="button" class="btn-prospectado-acao btn-anexar-manual" data-acao-prospectado="anexar-manual" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Preencher dados de consumo manualmente">
+        Anexar manual
+      </button>
+    </div>
+  `;
+}
+
+function renderProspectadoAcoesHtml(cliente) {
+  if (cliente.status !== 'prospectado' || cliente.id == null) return '';
+
+  const etapa = getClienteEtapaTrilha(cliente);
+  if (etapa === 'drone') return renderContaLuzAcoesHtml(cliente);
+  return renderPreCadastroAcoesHtml(cliente);
+}
+
+function handleAnexarManual(clienteId) {
+  const cliente = findClienteById(clienteId);
+  if (!cliente || !registrarClienteModalCtx) return;
+
+  abrirModalEditarCliente(cliente, registrarClienteModalCtx);
+  expandAccordionPanel(registrarClienteModalCtx.form, 'dados-consumo');
+  registrarClienteModalCtx.form.querySelector('#consumos-list .consumo-valor')?.focus();
 }
 
 async function handleProspectadoAcao(clienteId, acao) {
@@ -2886,6 +3072,9 @@ async function handleProspectadoAcao(clienteId, acao) {
     };
   } else if (acao === 'inviavel') {
     payload = { inviavel: true, status: 'perdido' };
+  } else if (acao === 'anexar-manual') {
+    handleAnexarManual(clienteId);
+    return;
   } else {
     return;
   }
@@ -3011,7 +3200,7 @@ function initClientesTrilhaHandlers(root = document) {
   root.dataset.trilhaBound = 'true';
 
   root.addEventListener('click', (event) => {
-    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .cliente-anexo-thumb, .cliente-anexo-name-link, .btn-editar-cliente, .btn-gerar-proposta, .cliente-prospectado-acoes, .btn-prospectado-acao')) {
+    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .cliente-anexo-thumb, .cliente-anexo-name-link, .btn-editar-cliente, .btn-gerar-proposta, .btn-anexar-conta, .cliente-prospectado-acoes, .btn-prospectado-acao')) {
       event.stopPropagation();
     }
 
@@ -3042,7 +3231,7 @@ function initClientesTrilhaHandlers(root = document) {
       return;
     }
 
-    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .cliente-prospectado-acoes, .btn-prospectado-acao')) {
+    if (event.target.closest('.cliente-anexo-upload, .cliente-anexo-input, .btn-anexar-conta, .cliente-prospectado-acoes, .btn-prospectado-acao')) {
       return;
     }
 
@@ -3339,6 +3528,28 @@ function populateDefinicaoPerfilFromCliente(form, perfil = {}) {
   updatePropostasPanel(form);
 }
 
+function populateDronePhotosFromCliente(form, arquivos = {}) {
+  const drone = arquivos.drone || {};
+  form.querySelectorAll('.upload-grid .upload-zone').forEach((zone) => {
+    delete zone.dataset.existingAnexo;
+    delete zone.dataset.existingAnexoData;
+    zone.classList.remove('has-file');
+    const preview = zone.querySelector('.upload-preview');
+    if (preview) preview.innerHTML = '';
+    const input = zone.querySelector('.upload-input');
+    if (input) input.value = '';
+  });
+
+  DRONE_SLOTS.forEach((slot) => {
+    const input = form.querySelector(`#drone-${slot.id}`);
+    const zone = input?.closest('.upload-zone');
+    const existing = drone[slot.id];
+    if (zone && existing?.name && anexoHasStoredFile(existing)) {
+      showExistingAnexoPreview(zone, { ...existing, label: existing.label || slot.label });
+    }
+  });
+}
+
 function populateFormFromCliente(form, cliente, dataRetornoPicker) {
   setFormInput(form, '#cliente-nome', cliente.nome || '');
   setFormInput(form, '#cliente-endereco', cliente.endereco || '');
@@ -3369,6 +3580,7 @@ function populateFormFromCliente(form, cliente, dataRetornoPicker) {
     ? cliente.arquivos.contaLuz
     : (cliente.arquivos?.contaLuz ? [cliente.arquivos.contaLuz] : []);
   populateContasLuzFromCliente(form, contas);
+  populateDronePhotosFromCliente(form, cliente.arquivos || {});
   populateDadosConsumoFromCliente(form, cliente.dadosConsumo || {});
   populateDefinicaoPerfilFromCliente(form, cliente.definicaoPerfil || {});
 }
