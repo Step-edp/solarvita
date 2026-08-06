@@ -2727,15 +2727,13 @@ function renderClienteDetalheHtml(cliente) {
 function renderProspectadoAcoesHtml(cliente) {
   if (cliente.status !== 'prospectado' || cliente.id == null) return '';
 
-  const possuiFotoBtn = cliente.possuiFoto
-    ? ''
-    : `<button type="button" class="btn-prospectado-acao btn-possui-foto" data-acao-prospectado="possui-foto" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Marcar que possui foto e avançar etapa">
-        Possui foto
-      </button>`;
+  const possuiFotoActive = cliente.possuiFoto ? ' is-active' : '';
 
   return `
     <div class="cliente-prospectado-acoes">
-      ${possuiFotoBtn}
+      <button type="button" class="btn-prospectado-acao btn-possui-foto${possuiFotoActive}" data-acao-prospectado="possui-foto" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Marcar que possui foto e avançar etapa">
+        Possui foto
+      </button>
       <button type="button" class="btn-prospectado-acao btn-inviavel" data-acao-prospectado="inviavel" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Marcar como inviável">
         Inviável
       </button>
@@ -2749,11 +2747,12 @@ async function handleProspectadoAcao(clienteId, acao) {
 
   let payload;
   if (acao === 'possui-foto') {
-    if (cliente.possuiFoto) return;
     const etapaAtual = getClienteEtapaTrilha(cliente);
+    const proximaEtapa = getProximaEtapaTrilha(etapaAtual);
+    if (cliente.possuiFoto && proximaEtapa === etapaAtual) return;
     payload = {
       possuiFoto: true,
-      etapaTrilha: getProximaEtapaTrilha(etapaAtual)
+      etapaTrilha: proximaEtapa
     };
   } else if (acao === 'inviavel') {
     payload = { inviavel: true, status: 'perdido' };
