@@ -1,5 +1,5 @@
 /**
- * Configuração de ambiente SolarVita
+ * Configuração de ambiente Sol Amplo
  */
 const SOLARVITA_CONFIG = {
   ambiente: 'teste',

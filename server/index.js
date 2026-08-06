@@ -73,7 +73,7 @@ async function start() {
 
   const app = createApp();
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`SolarVita rodando na porta ${PORT}`);
+    console.log(`Sol Amplo rodando na porta ${PORT}`);
   });
 }
 

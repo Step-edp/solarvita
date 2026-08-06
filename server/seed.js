@@ -4,7 +4,7 @@ const { hashPassword, onlyDigits } = require('./utils/users');
 const SEED_ADMIN = {
   nome: 'Administrador',
   cpf: '40280221851',
-  email: 'admin@solarvita.com.br',
+  email: 'admin@solamplo.com.br',
   senha: 'Step@241',
   tipo: 'admin',
   perfil: 'administrador',

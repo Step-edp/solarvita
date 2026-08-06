@@ -339,7 +339,7 @@ async function renderAdministradorDashboard(session) {
 
   if (defaultPanel) defaultPanel.hidden = true;
   adminPanel.hidden = false;
-  document.title = 'Painel do Administrador — SolarVita';
+  document.title = 'Painel do Administrador — Sol Amplo';
 
   const pendentes = await getPendingCadastros().catch((error) => {
     console.error(error);

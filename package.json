@@ -2,7 +2,7 @@
   "name": "solarvita",
   "version": "1.0.0",
   "private": true,
-  "description": "SolarVita — landing page e paineis de energia solar",
+  "description": "Sol Amplo — landing page e paineis de energia solar",
   "scripts": {
     "start": "node server/index.js"
   },

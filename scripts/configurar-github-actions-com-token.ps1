@@ -15,7 +15,7 @@ if (-not $Token) {
     Write-Host "=== Token GitHub para Actions ==="
     Write-Host ""
     Write-Host "1. Abra (logado como Step-edp):"
-    Write-Host "   https://github.com/settings/tokens/new?scopes=repo,workflow&description=SolarVita-Actions"
+    Write-Host "   https://github.com/settings/tokens/new?scopes=repo,workflow&description=SolAmplo-Actions"
     Write-Host ""
     Write-Host "2. Gere o token e cole abaixo (nao sera exibido):"
     $Token = Read-Host -AsSecureString
@@ -31,7 +31,7 @@ if (-not $Token -or $Token.Length -lt 20) {
 $headers = @{
     Authorization = "Bearer $Token"
     Accept        = 'application/vnd.github+json'
-    'User-Agent'  = 'SolarVita-Setup'
+    'User-Agent'  = 'SolAmplo-Setup'
 }
 
 Write-Host "Validando token..."

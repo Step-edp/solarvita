@@ -4268,7 +4268,7 @@ async function renderPainelOperacional(session) {
   if (!vendedorPanel || !profile) return;
 
   vendedorPanel.hidden = false;
-  document.title = `${profile.panelTitle} — SolarVita`;
+  document.title = `${profile.panelTitle} — Sol Amplo`;
 
   vendedorPanel.innerHTML = `
     <div class="panel-operacional-wrap">
@@ -4303,7 +4303,7 @@ async function renderVendedorDashboard(session) {
   if (!vendedorPanel) return;
 
   vendedorPanel.hidden = false;
-  document.title = 'Painel do Vendedor — SolarVita';
+  document.title = 'Painel do Vendedor — Sol Amplo';
 
   recalcularVendedorStats();
 
@@ -4451,7 +4451,7 @@ async function renderVendedorClientesPage(session) {
   const panel = document.getElementById('panel-clientes');
   if (!panel) return;
 
-  document.title = 'Base de Clientes — SolarVita';
+  document.title = 'Base de Clientes — Sol Amplo';
 
   panel.innerHTML = `
     <div class="vendedor-header">

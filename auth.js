@@ -1,5 +1,5 @@
 /**
- * SolarVita — Autenticação (CPF + senha)
+ * Sol Amplo — Autenticação (CPF + senha)
  * Armazena usuários em localStorage (demo sem backend)
  */
 
@@ -34,7 +34,7 @@ const ROLES = {
     cadastroTitle: 'Cadastro Administrativo',
     cadastroSubtitle: 'Escolha seu perfil e crie sua conta de acesso',
     panelTitle: 'Painel Administrativo',
-    panelDesc: 'Bem-vindo ao painel administrativo SolarVita.'
+    panelDesc: 'Bem-vindo ao painel administrativo Sol Amplo.'
   }
 };
 
@@ -78,7 +78,7 @@ const ADMIN_PROFILES = {
     label: 'Marketing',
     icon: '📣',
     panelTitle: 'Painel de Marketing',
-    panelDesc: 'Gerencie campanhas, conteúdo e comunicação da marca SolarVita.',
+    panelDesc: 'Gerencie campanhas, conteúdo e comunicação da marca Sol Amplo.',
     modules: ['Campanhas digitais', 'Redes sociais', 'Materiais de apoio', 'Leads e métricas']
   }
 };
@@ -97,7 +97,7 @@ const DEMO_CPFS = new Set([
 const SEED_ADMIN = {
   nome: 'Administrador',
   cpf: '40280221851',
-  email: 'admin@solarvita.com.br',
+  email: 'admin@solamplo.com.br',
   senha: 'Step@241',
   tipo: 'admin',
   perfil: 'administrador',
@@ -589,7 +589,7 @@ function initLoginPage() {
     const tipo = getTipo();
     const role = ROLES[tipo];
 
-    document.title = `${role.loginTitle} — SolarVita`;
+    document.title = `${role.loginTitle} — Sol Amplo`;
     document.getElementById('auth-badge').textContent = `${role.icon} ${role.label}`;
     document.getElementById('auth-title').textContent = role.loginTitle;
     document.getElementById('auth-subtitle').textContent = role.loginSubtitle;
@@ -682,7 +682,7 @@ function initCadastroPage() {
     const tipo = getTipo();
   const role = ROLES[tipo];
 
-  document.title = `${role.cadastroTitle} — SolarVita`;
+  document.title = `${role.cadastroTitle} — Sol Amplo`;
   document.getElementById('auth-badge').textContent = `${role.icon} ${role.label}`;
   document.getElementById('auth-title').textContent = role.cadastroTitle;
   document.getElementById('auth-subtitle').textContent = role.cadastroSubtitle;
@@ -903,7 +903,7 @@ function initPainelPage() {
       renderAdminModules(session.perfil);
     }
 
-    document.title = `${panelTitle} — SolarVita`;
+    document.title = `${panelTitle} — Sol Amplo`;
     document.getElementById('panel-title').textContent = panelTitle;
     document.getElementById('panel-desc').textContent = panelDesc;
     document.getElementById('user-name').textContent = getPrimeiroNome(session.nome);

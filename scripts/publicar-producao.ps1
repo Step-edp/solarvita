@@ -16,7 +16,7 @@ if (-not $token) {
 
 $headers = @{
     Authorization = "Bearer $token"
-    'User-Agent'  = 'SolarVita-Deploy'
+    'User-Agent'  = 'SolAmplo-Deploy'
     Accept        = 'application/vnd.github+json'
 }
 

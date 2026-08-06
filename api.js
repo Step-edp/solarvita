@@ -1,5 +1,5 @@
 /**
- * Cliente HTTP da API SolarVita
+ * Cliente HTTP da API Sol Amplo
  */
 const SolarVitaAPI = {
   async request(path, options = {}) {

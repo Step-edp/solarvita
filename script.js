@@ -1,5 +1,5 @@
 /**
- * SolarVita — Calculadora de Energia Solar
+ * Sol Amplo — Calculadora de Energia Solar
  * Estimativas baseadas em médias do mercado brasileiro (2026)
  */
 

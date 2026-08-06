@@ -1,4 +1,4 @@
-# SolarVita
+# Sol Amplo
 
 Landing page e painéis de energia solar (HTML/CSS/JS).
 
@@ -66,7 +66,7 @@ Templates em `deploy/workflows/`. Para ativar deploy via Actions:
 
 **Opcao A — Token (mais simples)**
 
-1. Gere um token em: https://github.com/settings/tokens/new?scopes=repo,workflow&description=SolarVita-Actions
+1. Gere um token em: https://github.com/settings/tokens/new?scopes=repo,workflow&description=SolAmplo-Actions
 2. Execute: `.\scripts\configurar-github-actions-com-token.ps1`
 3. Cole o token quando pedido
 

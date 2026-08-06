@@ -17,7 +17,7 @@ if (-not $gh) {
 }
 
 Write-Host ""
-Write-Host "=== Configurar GitHub Actions - SolarVita ==="
+Write-Host "=== Configurar GitHub Actions - Sol Amplo ==="
 Write-Host ""
 Write-Host "Passo 1: Autorizar permissao WORKFLOW no GitHub"
 Write-Host ""
@@ -73,7 +73,7 @@ $token = (& $gh auth token)
 $headers = @{
     Authorization = "Bearer $token"
     Accept        = 'application/vnd.github+json'
-    'User-Agent'  = 'SolarVita-Setup'
+    'User-Agent'  = 'SolAmplo-Setup'
 }
 $body = @{ build_type = 'workflow' } | ConvertTo-Json
 Invoke-RestMethod -Method Put -Uri "https://api.github.com/repos/Step-edp/solarvita/pages" -Headers $headers -Body $body -ContentType 'application/json' | Out-Null
