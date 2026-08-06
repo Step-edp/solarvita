@@ -4,7 +4,7 @@ const cookieParser = require('cookie-parser');
 const { migrate } = require('./migrate');
 const { seedAdmin } = require('./seed');
 
-const authRoutes = require('./routes/auth');
+const { MAX_FILE_SIZE_LABEL } = require('./uploads');
 const adminRoutes = require('./routes/admin');
 const vendedorRoutes = require('./routes/vendedor');
 
@@ -55,6 +55,20 @@ function createApp() {
   app.use(express.static(ROOT, { index: false }));
 
   app.use((err, req, res, next) => {
+    if (err?.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        error: 'arquivo_grande',
+        message: `O arquivo excede o limite de ${MAX_FILE_SIZE_LABEL}. Para vídeos 4K do drone, envie um trecho curto ou comprima o arquivo antes de anexar.`
+      });
+    }
+
+    if (err?.type === 'entity.too.large') {
+      return res.status(413).json({
+        error: 'arquivo_grande',
+        message: `Arquivo muito grande. Limite: ${MAX_FILE_SIZE_LABEL}.`
+      });
+    }
+
     console.error(err);
     res.status(500).json({ error: 'Erro interno do servidor.' });
   });

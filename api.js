@@ -2,6 +2,8 @@
  * Cliente HTTP da API Sol Amplo
  */
 const SolarVitaAPI = {
+  UPLOAD_TIMEOUT_MS: 600000,
+
   async fetchWithTimeout(url, options = {}, timeoutMs = 120000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -101,7 +103,7 @@ const SolarVitaAPI = {
       method: 'POST',
       credentials: 'include',
       body: formData
-    });
+    }, this.UPLOAD_TIMEOUT_MS);
 
     let data = {};
     try {
@@ -133,7 +135,7 @@ const SolarVitaAPI = {
       method: 'POST',
       credentials: 'include',
       body: formData
-    });
+    }, this.UPLOAD_TIMEOUT_MS);
 
     let data = {};
     try {

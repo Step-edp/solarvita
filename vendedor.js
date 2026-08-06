@@ -486,7 +486,19 @@ function resetFormAccordion(form) {
 function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function assertUploadSizeAllowed(file) {
+  const limit = SOLARVITA_CONFIG.maxUploadBytes || (500 * 1024 * 1024);
+  const label = SOLARVITA_CONFIG.maxUploadLabel || '500 MB';
+  if (file.size > limit) {
+    throw new Error(
+      `"${file.name}" é muito grande (${formatFileSize(file.size)}). Limite: ${label}. ` +
+      'Para vídeos 4K do drone, envie um trecho curto ou comprima antes de anexar.'
+    );
+  }
 }
 
 function revokePreviewUrls() {
@@ -1791,6 +1803,8 @@ function createImagePreview(file, maxWidth = 320, quality = 0.72) {
 async function buildFileInfo(file) {
   if (!file) return null;
 
+  assertUploadSizeAllowed(file);
+
   const info = {
     name: file.name,
     type: file.type || guessMimeFromName(file.name),
@@ -2065,6 +2079,14 @@ async function handleClienteAnexoUpload(input) {
   const anexoPath = input.dataset.anexoPath;
   const file = input.files?.[0];
   if (!file || !clienteId || !anexoPath) return;
+
+  try {
+    assertUploadSizeAllowed(file);
+  } catch (err) {
+    window.alert(err.message);
+    input.value = '';
+    return;
+  }
 
   const cliente = VENDEDOR_CLIENTES.find((item) => String(item.id) === String(clienteId));
   if (!cliente) return;
@@ -2379,7 +2401,7 @@ function getClientesBaseResumo(list) {
 
 const CLIENTE_TRILHA_ETAPAS = [
   { id: 'prospecao', label: 'Prospecção' },
-  { id: 'drone', label: 'Drone' },
+  { id: 'drone', label: 'Conta de Luz' },
   { id: 'proposta', label: 'Proposta' },
   { id: 'apresentacao', label: 'Apresentação' },
   { id: 'follow-up', label: 'Follow Up' },
@@ -2592,7 +2614,7 @@ function renderClienteAnexosHtml(arquivos, clienteId = '') {
 
   Object.entries(arquivos.drone || {}).forEach(([slotId, drone]) => {
     if (!drone?.name) return;
-    items.push(renderAnexoItem(drone, `Drone — ${drone.label || 'Foto'}`, {
+    items.push(renderAnexoItem(drone, `Conta de Luz — ${drone.label || 'Foto'}`, {
       clienteId,
       anexoPath: `drone:${slotId}`
     }));
@@ -4362,7 +4384,7 @@ function buildRegistrarClienteModalHtml() {
               <div id="accordion-registros-fotograficos" class="accordion-body" hidden>
                 <div class="accordion-inner">
                   <div class="form-section form-section-nested">
-                    <h3>Fotos de drone</h3>
+                    <h3>Conta de Luz</h3>
                     <div class="upload-grid">${renderDroneUploadFields()}</div>
                   </div>
 
@@ -4384,7 +4406,7 @@ function buildRegistrarClienteModalHtml() {
                       id: 'file-video',
                       label: 'Vídeo da visita',
                       accept: 'video/*',
-                      hint: 'MP4, MOV ou similar',
+                      hint: 'MP4, MOV ou similar · até 500 MB (comprima vídeos 4K longos)',
                       icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`,
                       large: true
                     })}
