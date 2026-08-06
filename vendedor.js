@@ -2400,7 +2400,7 @@ function getClientesBaseResumo(list) {
 }
 
 const CLIENTE_TRILHA_ETAPAS = [
-  { id: 'prospecao', label: 'Prospecção' },
+  { id: 'prospecao', label: 'Pré-Cadastro' },
   { id: 'drone', label: 'Conta de Luz' },
   { id: 'proposta', label: 'Proposta' },
   { id: 'apresentacao', label: 'Apresentação' },
@@ -3837,7 +3837,7 @@ const AGENDA_TIPOS = {
   visita: { label: 'Visita', class: 'agenda-visita' },
   retorno: { label: 'Retorno', class: 'agenda-retorno' },
   contrato: { label: 'Contrato', class: 'agenda-contrato' },
-  prospeccao: { label: 'Prospecção', class: 'agenda-prospeccao' },
+  prospeccao: { label: 'Pré-Cadastro', class: 'agenda-prospeccao' },
   reuniao: { label: 'Reunião', class: 'agenda-reuniao' }
 };
 
