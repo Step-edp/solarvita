@@ -2673,8 +2673,13 @@ body.modal-open {
 
 .upload-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.85rem;
+  align-items: start;
+}
+
+.upload-grid .upload-zone {
+  min-width: 0;
 }
 
 /* Upload zones modernos */
@@ -2752,11 +2757,22 @@ body.modal-open {
 }
 
 .upload-preview {
-  display: contents;
+  display: block;
+  width: 100%;
 }
 
 .upload-zone.has-file:not(.upload-zone-multi) .upload-preview {
   display: block;
+}
+
+.upload-zone.has-file:not(.upload-zone-multi) {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 27, 77, 0.1);
+  background: var(--color-white);
+  box-shadow: 0 2px 10px rgba(0, 18, 51, 0.08);
 }
 
 .upload-zone-multi .upload-preview {
