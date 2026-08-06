@@ -659,7 +659,7 @@ function renderContaLuzItem(id) {
       <div class="conta-luz-top">
         <div class="modal-field conta-luz-nome-field">
           <label for="conta-nome-${id}">Nome da conta de luz <span class="req">*</span></label>
-          <input type="text" id="conta-nome-${id}" class="conta-luz-nome" placeholder="Ex: Jan/2026 — Residência principal" required>
+          <input type="text" id="conta-nome-${id}" class="conta-luz-nome" placeholder="Ex: Jan/2026 — Residência principal">
         </div>
         <button type="button" class="btn-remove-conta" title="Remover conta" aria-label="Remover conta">&times;</button>
       </div>
@@ -2860,6 +2860,7 @@ function showModalAlert(form, message, type = 'error', options = {}) {
     el.textContent = message;
   }
   el.className = `modal-alert show ${type}`;
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function clearModalAlert(form) {
@@ -3318,21 +3319,11 @@ function initRegistrarCliente() {
 
     submitBtn.textContent = 'Capturando localização...';
 
-    let loc;
+    let loc = null;
     try {
       loc = await getLocalizacaoVendedor();
     } catch (err) {
-      if (err.code === 'PERMISSION_DENIED') {
-        showModalAlert(form, `
-          <strong>Localização bloqueada</strong>
-          ${getGeoDeniedInstructionsHtml()}
-        `, 'error', { html: true });
-      } else {
-        showModalAlert(form, err.message);
-      }
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Salvar cliente';
-      return;
+      console.warn('Localização indisponível ao salvar cliente:', err.message);
     }
 
     const agora = new Date();
@@ -3353,9 +3344,9 @@ function initRegistrarCliente() {
       etapaTrilha: 'prospecao',
       data: formatDataHoje(),
       carimbo,
-      lat: loc.lat,
-      lng: loc.lng,
-      accuracy: loc.accuracy
+      lat: loc?.lat ?? null,
+      lng: loc?.lng ?? null,
+      accuracy: loc?.accuracy ?? null
     };
 
     if (SOLARVITA_CONFIG.useDatabase) {
@@ -3375,6 +3366,7 @@ function initRegistrarCliente() {
 
     syncVisitasFromClientes();
     refreshClientesUI();
+    refreshClientesBaseUI();
     rebuildVendedorMapMarkers();
     fecharModal();
   });
@@ -4093,7 +4085,7 @@ function buildRegistrarClienteModalHtml() {
           <h2>Registrar cliente</h2>
           <button type="button" id="modal-fechar" class="modal-close" aria-label="Fechar">&times;</button>
         </div>
-        <form id="form-registrar-cliente" class="modal-form modal-form-scroll">
+        <form id="form-registrar-cliente" class="modal-form modal-form-scroll" novalidate>
 
           <div class="form-accordion">
             <div class="accordion-panel" data-accordion="dados-cliente">
@@ -4107,11 +4099,11 @@ function buildRegistrarClienteModalHtml() {
                 <div class="accordion-inner">
                   <div class="modal-field">
                     <label for="cliente-nome">Nome completo <span class="req">*</span></label>
-                    <input type="text" id="cliente-nome" placeholder="Nome do cliente" required>
+                    <input type="text" id="cliente-nome" placeholder="Nome do cliente">
                   </div>
                   <div class="modal-field">
                     <label for="cliente-endereco">Endereço <span class="req">*</span></label>
-                    <input type="text" id="cliente-endereco" placeholder="Rua, número, bairro, cidade" required>
+                    <input type="text" id="cliente-endereco" placeholder="Rua, número, bairro, cidade">
                   </div>
                   <div class="modal-field">
                     <label for="cliente-whatsapp">WhatsApp</label>
@@ -4120,7 +4112,7 @@ function buildRegistrarClienteModalHtml() {
                   <div class="modal-field">
                     <label for="cliente-data-retorno">Data de Retorno <span class="req">*</span></label>
                     <div class="date-picker" data-date-picker>
-                      <input type="hidden" id="cliente-data-retorno" name="dataRetorno" required>
+                      <input type="hidden" id="cliente-data-retorno" name="dataRetorno">
                       <button type="button" class="date-picker-trigger" aria-expanded="false" aria-haspopup="dialog" aria-controls="cliente-data-retorno-cal">
                         <svg class="date-picker-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                           <rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.75"/>
@@ -4154,7 +4146,7 @@ function buildRegistrarClienteModalHtml() {
                   </div>
                   <div class="modal-field">
                     <label for="cliente-tipo-retorno">Tipo de Retorno <span class="req">*</span></label>
-                    <select id="cliente-tipo-retorno" name="tipoRetorno" required>
+                    <select id="cliente-tipo-retorno" name="tipoRetorno">
                       ${renderTipoRetornoOptions()}
                     </select>
                     <div class="tipo-retorno-outros" id="cliente-tipo-retorno-outros-wrap" hidden>
@@ -4164,7 +4156,7 @@ function buildRegistrarClienteModalHtml() {
                   </div>
                   <div class="modal-field">
                     <label for="cliente-observacao">Observação <span class="req">*</span></label>
-                    <textarea id="cliente-observacao" rows="3" placeholder="Anotações sobre o cliente ou a visita" required></textarea>
+                    <textarea id="cliente-observacao" rows="3" placeholder="Anotações sobre o cliente ou a visita"></textarea>
                   </div>
                 </div>
               </div>
@@ -4459,7 +4451,7 @@ async function renderVendedorClientesPage(session) {
         <a href="/painel/admin" class="clientes-back-link">← Voltar ao painel</a>
         <h1>Minha base de clientes</h1>
       </div>
-      <a href="/painel/admin" class="btn btn-primary" id="btn-registrar-cliente">+ Registrar cliente</a>
+      <button type="button" class="btn btn-primary" id="btn-registrar-cliente">+ Registrar cliente</button>
     </div>
 
     ${buildRegistrarClienteModalHtml()}
