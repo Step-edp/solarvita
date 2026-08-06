@@ -2622,6 +2622,29 @@ body.modal-open {
   border-radius: 12px;
 }
 
+.conta-luz-item .upload-zone .upload-preview {
+  display: block;
+  width: 100%;
+}
+
+.conta-luz-item .upload-zone.has-file {
+  margin-top: 0.15rem;
+}
+
+.conta-luz-item .upload-zone-lg.has-file .preview-card {
+  min-height: 140px;
+}
+
+.conta-luz-item .upload-zone-lg.has-file .preview-file-icon {
+  height: 96px;
+  font-size: 1.35rem;
+}
+
+.conta-luz-item .upload-zone-lg.has-file .preview-file-icon.pdf {
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+}
+
 .conta-luz-item:last-child {
   margin-bottom: 0;
 }
@@ -2821,6 +2844,15 @@ body.modal-open {
   letter-spacing: 0.05em;
 }
 
+.preview-file-link {
+  text-decoration: none;
+  color: var(--color-white);
+}
+
+.preview-file-link:hover {
+  filter: brightness(1.08);
+}
+
 .preview-file-icon.video {
   font-size: 2rem;
   background: linear-gradient(135deg, var(--color-green), var(--color-green-dark));
@@ -2904,6 +2936,22 @@ body.modal-open {
 
 .upload-grid .upload-zone.has-file .preview-card {
   min-height: auto;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.upload-grid .upload-zone.has-file .preview-meta {
+  padding: 0.4rem 0.5rem;
+}
+
+.upload-grid .preview-replace {
+  position: absolute;
+  top: auto;
+  left: 0.45rem;
+  bottom: 0.45rem;
+  font-size: 0.62rem;
+  padding: 0.15rem 0.45rem;
 }
 
 .arq-badge {

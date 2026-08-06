@@ -542,7 +542,7 @@ function renderPreviewCard(file, inputId, index = null, zone = null) {
     <div class="preview-card">
       ${media}
       <div class="preview-meta">
-        <span class="preview-name">${file.name}</span>
+        <span class="preview-name">${escapeHtml(file.name)}</span>
         <span class="preview-size">${formatFileSize(file.size)}</span>
       </div>
       <button type="button" class="preview-replace" data-input="${inputId}"${idxAttr}>Trocar</button>
@@ -554,11 +554,14 @@ function renderPreviewCard(file, inputId, index = null, zone = null) {
 function renderExistingPreviewCard(file, inputId, src) {
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
   const isVideo = (file.type || '').startsWith('video/');
+  const openUrl = src && !isImageFile(file) ? src : '';
   let media = '<span class="preview-file-icon">📎</span>';
   if (src && isImageFile(file)) {
     media = `<img src="${src}" alt="" class="preview-img">`;
   } else if (isPdf) {
-    media = '<span class="preview-file-icon pdf">PDF</span>';
+    media = openUrl
+      ? `<a class="preview-file-icon pdf preview-file-link" href="${openUrl}" target="_blank" rel="noopener noreferrer">PDF</a>`
+      : '<span class="preview-file-icon pdf">PDF</span>';
   } else if (isVideo) {
     media = '<span class="preview-file-icon video">▶</span>';
   }
@@ -629,10 +632,33 @@ function syncInputFiles(input, files) {
   input.files = dt.files;
 }
 
+function syncContaLuzItemFromZone(zone) {
+  const item = zone?.closest('.conta-luz-item');
+  if (!item) return;
+
+  const input = zone.querySelector('.upload-input');
+  const file = input?.files?.[0];
+
+  if (file) {
+    delete item.dataset.existingAnexo;
+    delete item.dataset.existingAnexoData;
+    return;
+  }
+
+  if (zone.dataset.existingAnexo === 'true') {
+    item.dataset.existingAnexo = 'true';
+    item.dataset.existingAnexoData = zone.dataset.existingAnexoData || '';
+  } else {
+    delete item.dataset.existingAnexo;
+    delete item.dataset.existingAnexoData;
+  }
+}
+
 function setupUploadZone(zone) {
   const input = zone.querySelector('.upload-input');
   const drop = zone.querySelector('.upload-drop');
-  if (!input || !drop) return;
+  if (!input || !drop || zone.dataset.uploadBound === 'true') return;
+  zone.dataset.uploadBound = 'true';
 
   if (input.multiple) zone._files = [];
 
@@ -642,6 +668,7 @@ function setupUploadZone(zone) {
       syncInputFiles(input, zone._files);
     }
     refreshUploadZone(input);
+    syncContaLuzItemFromZone(zone);
   });
 
   ['dragenter', 'dragover'].forEach(evt => {
@@ -668,6 +695,7 @@ function setupUploadZone(zone) {
       syncInputFiles(input, [files[0]]);
     }
     refreshUploadZone(input);
+    syncContaLuzItemFromZone(zone);
   });
 }
 
@@ -700,6 +728,7 @@ function setupFileUploads(form) {
       }
     }
     refreshUploadZone(input);
+    syncContaLuzItemFromZone(input.closest('.upload-zone'));
   });
 }
 
@@ -818,8 +847,11 @@ function initContasLuz(form) {
 function validateContasLuz(form) {
   for (const item of form.querySelectorAll('.conta-luz-item')) {
     const nomeConta = item.querySelector('.conta-luz-nome')?.value.trim();
+    const zone = item.querySelector('.upload-zone');
     const hasFile = !!item.querySelector('.upload-input')?.files?.[0];
-    const hasExisting = item.dataset.existingAnexo === 'true';
+    const hasExisting = item.dataset.existingAnexo === 'true'
+      || zone?.dataset.existingAnexo === 'true'
+      || zone?.classList.contains('has-file');
     if (hasFile && !nomeConta) {
       return 'Informe o nome de cada conta de luz anexada.';
     }
@@ -3385,11 +3417,15 @@ function populateContasLuzFromCliente(form, contas = []) {
     const conta = items[index] || {};
     const nomeInput = item.querySelector('.conta-luz-nome');
     if (nomeInput) nomeInput.value = conta.nomeConta || '';
-    if (conta.url || conta.preview) {
+    const zone = item.querySelector('.upload-zone');
+    if (zone && (conta.url || conta.preview || conta.name)) {
+      showExistingAnexoPreview(zone, conta);
+      item.dataset.existingAnexo = 'true';
+      item.dataset.existingAnexoData = JSON.stringify(conta);
+    } else if (conta.url || conta.preview) {
       item.dataset.existingAnexo = 'true';
       item.dataset.existingAnexoData = JSON.stringify(conta);
     }
-    const zone = item.querySelector('.upload-zone');
     if (zone) setupUploadZone(zone);
   });
 
