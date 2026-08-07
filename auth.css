@@ -1040,6 +1040,7 @@ body.auth-page {
 .clientes-resumo-convertido { border-left-color: var(--color-green); }
 .clientes-resumo-apresentado { border-left-color: #003D8F; }
 .clientes-resumo-prospectado { border-left-color: #64748b; }
+.clientes-resumo-nao-quis { border-left-color: #d97706; }
 .clientes-resumo-perdido { border-left-color: #dc2626; }
 
 .clientes-resumo-num {
@@ -1644,7 +1645,8 @@ body.auth-page {
   cursor: pointer;
 }
 
-.btn-anexar-conta:hover {
+.btn-anexar-conta:hover,
+.btn-anexar-conta.is-active {
   color: #fff;
   background: linear-gradient(180deg, #4ade80 0%, #16a34a 55%, #15803d 100%);
   border-color: #166534;
@@ -1652,6 +1654,21 @@ body.auth-page {
     0 1px 0 rgba(255, 255, 255, 0.3) inset,
     0 4px 0 #166534,
     0 6px 14px rgba(22, 163, 74, 0.38);
+}
+
+.btn-anexar-conta.is-active {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 2px 0 #166534,
+    0 0 0 2px rgba(74, 222, 128, 0.35),
+    0 4px 12px rgba(22, 163, 74, 0.35);
+}
+
+.btn-anexar-conta:active {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.15) inset,
+    0 1px 0 #166534,
+    0 2px 6px rgba(22, 163, 74, 0.25);
 }
 
 .btn-anexar-conta.is-loading {
@@ -1991,6 +2008,11 @@ body.auth-page {
 .status-perdido {
   background: rgba(220, 38, 38, 0.1);
   color: #991b1b;
+}
+
+.status-nao-quis {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
 }
 
 .status-prospectado {

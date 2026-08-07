@@ -308,6 +308,8 @@ router.patch('/clientes/:id', async (req, res, next) => {
       'status',
       'possuiFoto',
       'inviavel',
+      'semContaLuz',
+      'naoQuis',
       'etapaTrilha'
     ];
 

@@ -2307,14 +2307,6 @@ async function handleClienteAnexoUpload(input) {
 
       const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(clienteId));
       if (idx >= 0) VENDEDOR_CLIENTES[idx] = data.cliente;
-
-      if (anexoPath.startsWith('contaLuz:') && getClienteEtapaTrilha(data.cliente) === 'drone') {
-        const proximaEtapa = getProximaEtapaTrilha('drone');
-        if (proximaEtapa !== 'drone') {
-          const updated = await SolarVitaAPI.updateVendedorCliente(clienteId, { etapaTrilha: proximaEtapa });
-          if (idx >= 0) VENDEDOR_CLIENTES[idx] = updated.cliente;
-        }
-      }
     } else {
       const uploaded = await buildFileInfo(file);
       const current = getAnexoAtPath(cliente.arquivos, anexoPath) || {};
@@ -2540,7 +2532,7 @@ function recalcularVendedorStats() {
   clientes.forEach((cliente) => {
     if (cliente.status === 'apresentado') VENDEDOR_STATS.apresentadas += 1;
     else if (cliente.status === 'convertido') VENDEDOR_STATS.convertidas += 1;
-    else if (cliente.status === 'perdido') VENDEDOR_STATS.perdidas += 1;
+    else if (cliente.status === 'perdido' || cliente.status === 'nao_quis') VENDEDOR_STATS.perdidas += 1;
     else if (cliente.status === 'prospectado') VENDEDOR_STATS.prospectados += 1;
   });
 }
@@ -2608,7 +2600,8 @@ function getClientesBaseResumo(list) {
     convertido: 0,
     apresentado: 0,
     prospectado: 0,
-    perdido: 0
+    perdido: 0,
+    nao_quis: 0
   };
   list.forEach((c) => {
     if (resumo[c.status] != null) resumo[c.status] += 1;
@@ -2656,6 +2649,7 @@ function saveClientesFiltroStatus(status) {
 
 function getClienteEtapaTrilha(cliente) {
   if (cliente?.etapaTrilha) return cliente.etapaTrilha;
+  if (cliente?.possuiFoto) return 'drone';
   if (cliente?.status === 'apresentado') return 'apresentacao';
   if (cliente?.status === 'convertido') return 'acompanhamento';
   return 'prospecao';
@@ -3082,15 +3076,6 @@ function renderClienteDetalheHtml(cliente) {
   `;
 }
 
-function getNextContaLuzAnexoPath(arquivos) {
-  const contas = Array.isArray(arquivos?.contaLuz)
-    ? arquivos.contaLuz
-    : (arquivos?.contaLuz ? [arquivos.contaLuz] : []);
-  const missingIdx = contas.findIndex((conta) => !anexoHasStoredFile(conta));
-  const index = missingIdx >= 0 ? missingIdx : contas.length;
-  return `contaLuz:${index}`;
-}
-
 function renderPreCadastroAcoesHtml(cliente) {
   const possuiFotoActive = cliente.possuiFoto ? ' is-active' : '';
 
@@ -3106,19 +3091,24 @@ function renderPreCadastroAcoesHtml(cliente) {
   `;
 }
 
+function hasContaLuzAnexada(arquivos) {
+  const contas = Array.isArray(arquivos?.contaLuz)
+    ? arquivos.contaLuz
+    : (arquivos?.contaLuz ? [arquivos.contaLuz] : []);
+  return contas.some((conta) => anexoHasStoredFile(conta));
+}
+
 function renderContaLuzAcoesHtml(cliente) {
-  const anexoPath = getNextContaLuzAnexoPath(cliente.arquivos);
+  const contaAnexadaActive = hasContaLuzAnexada(cliente.arquivos) ? ' is-active' : '';
 
   return `
     <div class="cliente-prospectado-acoes">
-      <button type="button" class="btn-prospectado-acao btn-inviavel" data-acao-prospectado="inviavel" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Inviável para anexar conta de luz">
-        Inviável
+      <button type="button" class="btn-prospectado-acao btn-inviavel" data-acao-prospectado="sem-conta-luz" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Cliente não disponibilizou conta de luz">
+        Não disponibilizou conta
       </button>
-      <label class="btn-prospectado-acao btn-anexar-conta" title="Conta de luz anexada — clique para enviar ou trocar">
-        <input type="file" class="cliente-anexo-input" accept=".pdf,image/*" hidden
-          data-cliente-id="${escapeHtml(String(cliente.id))}" data-anexo-path="${escapeHtml(anexoPath)}">
+      <button type="button" class="btn-prospectado-acao btn-anexar-conta${contaAnexadaActive}" data-acao-prospectado="conta-anexada" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Confirmar conta anexada e avançar etapa">
         Conta anexada
-      </label>
+      </button>
       <button type="button" class="btn-prospectado-acao btn-anexar-manual" data-acao-prospectado="anexar-manual" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Preencher dados de consumo manualmente">
         Anexar manual
       </button>
@@ -3143,7 +3133,7 @@ function handleAnexarManual(clienteId) {
   registrarClienteModalCtx.form.querySelector('#consumos-list .consumo-valor')?.focus();
 }
 
-async function handleProspectadoAcao(clienteId, acao) {
+async function handleProspectadoAcao(clienteId, acao, triggerBtn = null) {
   const cliente = findClienteById(clienteId);
   if (!cliente || cliente.status !== 'prospectado') return;
 
@@ -3156,6 +3146,17 @@ async function handleProspectadoAcao(clienteId, acao) {
       possuiFoto: true,
       etapaTrilha: proximaEtapa
     };
+  } else if (acao === 'conta-anexada') {
+    const etapaAtual = getClienteEtapaTrilha(cliente);
+    const etapaContaLuz = etapaAtual === 'drone' || (cliente.possuiFoto && etapaAtual === 'prospecao')
+      ? 'drone'
+      : etapaAtual;
+    if (etapaContaLuz !== 'drone') return;
+    const proximaEtapa = getProximaEtapaTrilha('drone');
+    if (proximaEtapa === 'drone') return;
+    payload = { etapaTrilha: proximaEtapa };
+  } else if (acao === 'sem-conta-luz') {
+    payload = { inviavel: true, semContaLuz: true, status: 'nao_quis' };
   } else if (acao === 'inviavel') {
     payload = { inviavel: true, status: 'perdido' };
   } else if (acao === 'anexar-manual') {
@@ -3166,6 +3167,11 @@ async function handleProspectadoAcao(clienteId, acao) {
   }
 
   try {
+    if (triggerBtn) {
+      triggerBtn.disabled = true;
+      triggerBtn.classList.add('is-loading');
+    }
+
     if (SOLARVITA_CONFIG.useDatabase) {
       const data = await SolarVitaAPI.updateVendedorCliente(clienteId, payload);
       const idx = VENDEDOR_CLIENTES.findIndex((item) => String(item.id) === String(clienteId));
@@ -3181,6 +3187,11 @@ async function handleProspectadoAcao(clienteId, acao) {
     rebuildVendedorMapMarkers();
   } catch (err) {
     window.alert(err.message || 'Não foi possível atualizar o cliente.');
+  } finally {
+    if (triggerBtn) {
+      triggerBtn.disabled = false;
+      triggerBtn.classList.remove('is-loading');
+    }
   }
 }
 
@@ -3273,6 +3284,7 @@ function refreshClientesBaseUI() {
       <div class="clientes-resumo-item clientes-resumo-convertido"><span class="clientes-resumo-num">${resumo.convertido}</span><span>Convertidos</span></div>
       <div class="clientes-resumo-item clientes-resumo-apresentado"><span class="clientes-resumo-num">${resumo.apresentado}</span><span>Apresentados</span></div>
       <div class="clientes-resumo-item clientes-resumo-prospectado"><span class="clientes-resumo-num">${resumo.prospectado}</span><span>Prospectados</span></div>
+      <div class="clientes-resumo-item clientes-resumo-nao-quis"><span class="clientes-resumo-num">${resumo.nao_quis}</span><span>Sem conta de luz</span></div>
       <div class="clientes-resumo-item clientes-resumo-perdido"><span class="clientes-resumo-num">${resumo.perdido}</span><span>Perdidos</span></div>
     `;
   }
@@ -3292,7 +3304,7 @@ function initClientesTrilhaHandlers(root = document) {
 
     const acaoBtn = event.target.closest('[data-acao-prospectado]');
     if (acaoBtn && root.contains(acaoBtn)) {
-      handleProspectadoAcao(acaoBtn.dataset.clienteId, acaoBtn.dataset.acaoProspectado);
+      handleProspectadoAcao(acaoBtn.dataset.clienteId, acaoBtn.dataset.acaoProspectado, acaoBtn);
       return;
     }
 
@@ -4416,6 +4428,7 @@ const STATUS_LABELS = {
   convertido: { label: 'Convertido', class: 'status-convertido' },
   apresentado: { label: 'Apresentado', class: 'status-apresentado' },
   perdido: { label: 'Perdido', class: 'status-perdido' },
+  nao_quis: { label: 'Não disponibilizou conta de luz', class: 'status-nao-quis' },
   prospectado: { label: 'Prospectado', class: 'status-prospectado' }
 };
 
@@ -5067,6 +5080,7 @@ async function renderVendedorClientesPage(session) {
             <option value="convertido">Convertido</option>
             <option value="apresentado">Apresentado</option>
             <option value="prospectado">Prospectado</option>
+            <option value="nao_quis">Não disponibilizou conta de luz</option>
             <option value="perdido">Perdido</option>
           </select>
           <span id="clientes-count" class="clientes-count"></span>
