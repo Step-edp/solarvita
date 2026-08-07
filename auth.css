@@ -2698,11 +2698,47 @@ body.modal-open {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.85rem;
-  align-items: start;
+  align-items: stretch;
 }
 
 .upload-grid .upload-zone {
   min-width: 0;
+  min-height: 118px;
+}
+
+.upload-grid .upload-zone.has-file {
+  display: flex;
+  flex-direction: column;
+  min-height: 118px;
+}
+
+.upload-grid .upload-zone.has-file .upload-preview {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+}
+
+.upload-grid .upload-zone.has-file .preview-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 118px;
+  background: #0a1628;
+}
+
+.upload-grid .upload-zone.has-file .preview-img {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 72px;
+  height: auto;
+  max-height: 110px;
+  object-fit: cover;
+  display: block;
+}
+
+.upload-grid .upload-zone.has-file .preview-meta {
+  flex-shrink: 0;
 }
 
 /* Upload zones modernos */
@@ -2934,8 +2970,18 @@ body.modal-open {
   height: 88px;
 }
 
+.upload-grid .upload-zone.has-file .preview-img {
+  height: auto;
+}
+
+.upload-grid .upload-zone.has-file .preview-file-icon {
+  flex: 1 1 auto;
+  min-height: 72px;
+  height: auto;
+}
+
 .upload-grid .upload-zone.has-file .preview-card {
-  min-height: auto;
+  min-height: 118px;
   border: none;
   border-radius: 0;
   box-shadow: none;

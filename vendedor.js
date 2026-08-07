@@ -522,12 +522,14 @@ function trackZonePreviewUrl(zone, url) {
   previewUrls.push(url);
 }
 
-function renderPreviewCard(file, inputId, index = null, zone = null) {
+function renderPreviewCard(file, inputId, index = null, zone = null, imageSrc = null) {
   const isImage = isImageFile(file);
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
   const isVideo = (file.type || '').startsWith('video/');
   let media = '<span class="preview-file-icon">📎</span>';
-  if (isImage) {
+  if (isImage && imageSrc) {
+    media = `<img src="${imageSrc}" alt="" class="preview-img">`;
+  } else if (isImage) {
     const url = URL.createObjectURL(file);
     if (zone) trackZonePreviewUrl(zone, url);
     else previewUrls.push(url);
@@ -590,7 +592,22 @@ function showExistingAnexoPreview(zone, file) {
   preview.innerHTML = renderExistingPreviewCard(file, input.id, getAnexoImageSrc(file) || getAnexoOpenUrl(file));
 }
 
-function refreshUploadZone(input) {
+async function buildPreviewImageSrc(file) {
+  if (!isImageFile(file)) return null;
+  const dataUrl = await createImagePreview(file, 720, 0.85);
+  if (dataUrl) return dataUrl;
+  try {
+    const converted = await compressImageFileForUpload(file, 1280, 0.82);
+    if (converted !== file) {
+      return createImagePreview(converted, 720, 0.85);
+    }
+  } catch {
+    // mantém fallback abaixo
+  }
+  return null;
+}
+
+async function refreshUploadZone(input) {
   const zone = input.closest('.upload-zone');
   if (!zone) return;
   const preview = zone.querySelector('.upload-preview');
@@ -601,29 +618,46 @@ function refreshUploadZone(input) {
     const files = zone._files || [];
     zone.classList.toggle('has-file', files.length > 0);
     preview.innerHTML = files.map((f, i) => renderPreviewCard(f, input.id, i, zone)).join('');
+    for (let i = 0; i < files.length; i += 1) {
+      const file = files[i];
+      const imageSrc = await buildPreviewImageSrc(file);
+      if (!imageSrc) continue;
+      const card = preview.querySelector(`.preview-card:nth-child(${i + 1})`);
+      const img = card?.querySelector('.preview-img');
+      if (img) img.src = imageSrc;
+    }
     return;
   }
 
   const file = input.files[0];
-  zone.classList.toggle('has-file', !!file);
   if (file) {
     delete zone.dataset.existingAnexo;
     delete zone.dataset.existingAnexoData;
+    zone.classList.add('has-file');
     preview.innerHTML = renderPreviewCard(file, input.id, null, zone);
-  } else if (zone.dataset.existingAnexo === 'true') {
-    try {
-      const existing = JSON.parse(zone.dataset.existingAnexoData || 'null');
-      if (existing) {
-        preview.innerHTML = renderExistingPreviewCard(existing, input.id, getAnexoImageSrc(existing) || getAnexoOpenUrl(existing));
-        zone.classList.add('has-file');
-        return;
-      }
-    } catch {
-      // ignore parse errors
+    const imageSrc = await buildPreviewImageSrc(file);
+    if (input.files[0] === file && imageSrc) {
+      const img = preview.querySelector('.preview-img');
+      if (img) img.src = imageSrc;
+      else preview.innerHTML = renderPreviewCard(file, input.id, null, zone, imageSrc);
     }
-  }
+  } else {
+    zone.classList.remove('has-file');
+    if (zone.dataset.existingAnexo === 'true') {
+      try {
+        const existing = JSON.parse(zone.dataset.existingAnexoData || 'null');
+        if (existing) {
+          preview.innerHTML = renderExistingPreviewCard(existing, input.id, getAnexoImageSrc(existing) || getAnexoOpenUrl(existing));
+          zone.classList.add('has-file');
+          return;
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
 
-  preview.innerHTML = '';
+    preview.innerHTML = '';
+  }
 }
 
 function syncInputFiles(input, files) {
@@ -662,12 +696,12 @@ function setupUploadZone(zone) {
 
   if (input.multiple) zone._files = [];
 
-  input.addEventListener('change', () => {
+  input.addEventListener('change', async () => {
     if (input.multiple) {
       zone._files = [...(zone._files || []), ...Array.from(input.files)];
       syncInputFiles(input, zone._files);
     }
-    refreshUploadZone(input);
+    await refreshUploadZone(input);
     syncContaLuzItemFromZone(zone);
   });
 
@@ -685,7 +719,7 @@ function setupUploadZone(zone) {
     });
   });
 
-  drop.addEventListener('drop', (e) => {
+  drop.addEventListener('drop', async (e) => {
     const files = Array.from(e.dataTransfer.files);
     if (!files.length) return;
     if (input.multiple) {
@@ -694,7 +728,7 @@ function setupUploadZone(zone) {
     } else {
       syncInputFiles(input, [files[0]]);
     }
-    refreshUploadZone(input);
+    await refreshUploadZone(input);
     syncContaLuzItemFromZone(zone);
   });
 }
@@ -702,7 +736,7 @@ function setupUploadZone(zone) {
 function setupFileUploads(form) {
   form.querySelectorAll('.upload-zone').forEach(setupUploadZone);
 
-  form.addEventListener('click', (e) => {
+  form.addEventListener('click', async (e) => {
     const replaceBtn = e.target.closest('.preview-replace');
     if (replaceBtn) {
       const input = form.querySelector(`#${replaceBtn.dataset.input}`);
@@ -727,7 +761,7 @@ function setupFileUploads(form) {
         delete zone.dataset.existingAnexoData;
       }
     }
-    refreshUploadZone(input);
+    await refreshUploadZone(input);
     syncContaLuzItemFromZone(input.closest('.upload-zone'));
   });
 }
@@ -2599,6 +2633,26 @@ const CLIENTE_TRILHA_ETAPAS = [
 
 let clientesFiltroEtapa = '';
 let expandedClienteRowId = '';
+const CLIENTES_FILTRO_ETAPA_KEY = 'solamplo:clientes-filtro-etapa';
+const CLIENTES_FILTRO_STATUS_KEY = 'solamplo:clientes-filtro-status';
+
+function loadClientesFiltroEtapa() {
+  return sessionStorage.getItem(CLIENTES_FILTRO_ETAPA_KEY) || '';
+}
+
+function saveClientesFiltroEtapa(etapa) {
+  if (etapa) sessionStorage.setItem(CLIENTES_FILTRO_ETAPA_KEY, etapa);
+  else sessionStorage.removeItem(CLIENTES_FILTRO_ETAPA_KEY);
+}
+
+function loadClientesFiltroStatus() {
+  return sessionStorage.getItem(CLIENTES_FILTRO_STATUS_KEY) || '';
+}
+
+function saveClientesFiltroStatus(status) {
+  if (status) sessionStorage.setItem(CLIENTES_FILTRO_STATUS_KEY, status);
+  else sessionStorage.removeItem(CLIENTES_FILTRO_STATUS_KEY);
+}
 
 function getClienteEtapaTrilha(cliente) {
   if (cliente?.etapaTrilha) return cliente.etapaTrilha;
@@ -3060,10 +3114,10 @@ function renderContaLuzAcoesHtml(cliente) {
       <button type="button" class="btn-prospectado-acao btn-inviavel" data-acao-prospectado="inviavel" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Inviável para anexar conta de luz">
         Inviável
       </button>
-      <label class="btn-prospectado-acao btn-anexar-conta" title="Anexar PDF ou foto da conta de luz">
+      <label class="btn-prospectado-acao btn-anexar-conta" title="Conta de luz anexada — clique para enviar ou trocar">
         <input type="file" class="cliente-anexo-input" accept=".pdf,image/*" hidden
           data-cliente-id="${escapeHtml(String(cliente.id))}" data-anexo-path="${escapeHtml(anexoPath)}">
-        Anexar conta
+        Conta anexada
       </label>
       <button type="button" class="btn-prospectado-acao btn-anexar-manual" data-acao-prospectado="anexar-manual" data-cliente-id="${escapeHtml(String(cliente.id))}" title="Preencher dados de consumo manualmente">
         Anexar manual
@@ -3280,6 +3334,7 @@ function initClientesTrilhaHandlers(root = document) {
 
     const etapa = btn.dataset.etapaTrilha;
     clientesFiltroEtapa = clientesFiltroEtapa === etapa ? '' : etapa;
+    saveClientesFiltroEtapa(clientesFiltroEtapa);
     refreshClientesBaseUI();
   });
 
@@ -4974,7 +5029,7 @@ function initVendedorMap() {
 
 async function renderVendedorClientesPage(session) {
   await syncVendedorClientesFromApi();
-  clientesFiltroEtapa = '';
+  clientesFiltroEtapa = loadClientesFiltroEtapa();
   expandedClienteRowId = '';
 
   const panel = document.getElementById('panel-clientes');
@@ -5034,10 +5089,17 @@ async function renderVendedorClientesPage(session) {
     </section>
   `;
 
+  const savedStatus = loadClientesFiltroStatus();
+  const statusSelect = document.getElementById('clientes-filtro-status');
+  if (statusSelect && savedStatus) statusSelect.value = savedStatus;
+
   refreshClientesBaseUI();
   initRegistrarCliente();
   initClientesTrilhaHandlers(panel);
 
   document.getElementById('clientes-busca')?.addEventListener('input', refreshClientesBaseUI);
-  document.getElementById('clientes-filtro-status')?.addEventListener('change', refreshClientesBaseUI);
+  document.getElementById('clientes-filtro-status')?.addEventListener('change', () => {
+    saveClientesFiltroStatus(document.getElementById('clientes-filtro-status')?.value || '');
+    refreshClientesBaseUI();
+  });
 }
